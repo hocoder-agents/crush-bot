@@ -51,6 +51,8 @@ crushbot daemon install      # writes ~/.config/systemd/user/crushbot.service an
 crushbot daemon uninstall
 ```
 
+The unit’s `PATH` is the directory that contains `crushbot`, then `/usr/local/bin:/usr/bin:/bin`. Put `crush` next to `crushbot` (typically both in `~/.local/bin`) or the service exits with `crush not found on PATH`. Re-run `crushbot daemon install` after you move the binary.
+
 ## How to use
 
 ### Roster
