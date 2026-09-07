@@ -30,4 +30,7 @@ func TestDaemonInstallWritesUnit(t *testing.T) {
 	if !strings.Contains(body, "CRUSHBOT_HOME=") {
 		t.Fatalf("%s", body)
 	}
+	if !strings.Contains(body, "Environment=PATH=") {
+		t.Fatalf("%s", body)
+	}
 }

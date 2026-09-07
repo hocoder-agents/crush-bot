@@ -23,6 +23,7 @@ func unitPath() (string, error) {
 }
 
 func unitBody(exe, home string) string {
+	path := filepath.Dir(exe) + ":/usr/local/bin:/usr/bin:/bin"
 	return fmt.Sprintf(`[Unit]
 Description=crushbot mesh daemon
 After=default.target
@@ -33,10 +34,11 @@ ExecStart=%s daemon run
 Restart=on-failure
 RestartSec=2
 Environment=CRUSHBOT_HOME=%s
+Environment=PATH=%s
 
 [Install]
 WantedBy=default.target
-`, exe, home)
+`, exe, home, path)
 }
 
 func daemonInstall(io IO) int {
