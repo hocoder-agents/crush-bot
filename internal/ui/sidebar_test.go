@@ -386,3 +386,104 @@ func TestApplyProjectUpdatesCrew(t *testing.T) {
 		t.Fatalf("protocol not regenerated: %v", err)
 	}
 }
+
+func TestProjectModalCapturesArrows(t *testing.T) {
+	home := t.TempDir()
+	for _, s := range []string{"diana", "natasha"} {
+		if err := roster.Save(home, roster.Bot{Slug: s}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	base := Model{home: home}
+	base.reload()
+	base.cursor = 0
+	mi, _ := base.openProjectForm()
+	m := mi.(Model)
+	mi, _ = m.updateProjectForm(tea.KeyPressMsg{Code: tea.KeyDown})
+	m = mi.(Model)
+	if m.projectForm.cursor != 1 {
+		t.Fatalf("modal cursor did not move: %d", m.projectForm.cursor)
+	}
+	if m.cursor != 0 {
+		t.Fatalf("roster cursor moved behind modal: %d", m.cursor)
+	}
+	// through the full Update path too
+	mi, cmd := m.Update(tea.KeyPressMsg{Code: 'j'})
+	if mm := mi.(Model); mm.projectForm.cursor != 2 {
+		t.Fatalf("j via Update did not move modal cursor: %d", mm.projectForm.cursor)
+	}
+	mi, cmd = m.Update(tea.KeyPressMsg{Code: tea.KeyUp})
+	m = mi.(Model)
+	if m.projectForm.cursor != 0 {
+		t.Fatalf("up arrow did not move modal cursor: %d", m.projectForm.cursor)
+	}
+	if m.cursor != 0 {
+		t.Fatalf("roster cursor moved via Update: %d", m.cursor)
+	}
+	_ = cmd
+}
+
+func TestProjectModalKeysAndFind(t *testing.T) {
+	home := t.TempDir()
+	if err := roster.Save(home, roster.Bot{Slug: "diana"}); err != nil {
+		t.Fatal(err)
+	}
+	// two repos under home, one outside project_roots
+	mk := func(rel string) {
+		if err := os.MkdirAll(filepath.Join(home, rel, ".git"), 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	mk("other/wrapmind/wrapmind")
+	mk("repos/dogfood/app")
+	mk("repos/dogfood/app2")
+	// parent dirs of repos shouldn't count
+	base := Model{home: home}
+	base.reload()
+	t.Setenv("HOME", home) // find mode scans ~; keep it hermetic
+	mi, _ := base.openProjectForm()
+	m := mi.(Model)
+	if !m.projectForm.active {
+		t.Fatal("modal not open")
+	}
+	// arrows captured via the full Update path
+	mi, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
+	m = mi.(Model)
+	if m.projectForm.cursor != 1 {
+		t.Fatalf("down did not move modal cursor: %d", m.projectForm.cursor)
+	}
+	if m.cursor != 0 {
+		t.Fatalf("roster cursor moved behind modal: %d", m.cursor)
+	}
+	// find mode: / + query reaches the repo outside project_roots
+	mi, _ = m.updateProjectForm(tea.KeyPressMsg{Code: '/'})
+	m = mi.(Model)
+	if !m.projectForm.find {
+		t.Fatal("/ did not enter find mode")
+	}
+	for _, r := range []rune("wrapmind") {
+		mi, _ = m.updateProjectForm(tea.KeyPressMsg{Code: r, Text: string(r)})
+		m = mi.(Model)
+	}
+	if len(m.projectForm.items) != 1 || m.projectForm.items[0] != filepath.Join(home, "other", "wrapmind", "wrapmind") {
+		t.Fatalf("find results wrong: %v", m.projectForm.items)
+	}
+	mi, _ = m.updateProjectForm(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = mi.(Model)
+	if m.projectForm.active {
+		t.Fatal("modal should close after apply")
+	}
+	if got := m.rows[0].bot.Project; got != filepath.Join(home, "other", "wrapmind", "wrapmind") {
+		t.Fatalf("project not applied: %q", got)
+	}
+	// esc in find mode steps back to the list
+	mi, _ = m.openProjectForm()
+	m = mi.(Model)
+	mi, _ = m.updateProjectForm(tea.KeyPressMsg{Code: '/'})
+	m = mi.(Model)
+	mi, _ = m.updateProjectForm(tea.KeyPressMsg{Code: tea.KeyEscape})
+	m = mi.(Model)
+	if m.projectForm.find || !m.projectForm.active {
+		t.Fatalf("esc should leave find mode but keep the modal open")
+	}
+}
