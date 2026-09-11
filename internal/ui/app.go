@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 
 	"charm.land/bubbles/v2/textinput"
@@ -82,6 +83,14 @@ func (m *Model) reload() {
 		m.rows = nil
 		return
 	}
+	// The orchestrator leads the roster.
+	sort.Slice(bots, func(i, j int) bool {
+		pi, pj := bots[i].Slug == "sophie", bots[j].Slug == "sophie"
+		if pi != pj {
+			return pi
+		}
+		return bots[i].Slug < bots[j].Slug
+	})
 	m.rows = m.rows[:0]
 	for _, b := range bots {
 		home := roster.Home(m.home, b.Slug)
@@ -498,9 +507,6 @@ func (m Model) sidebarView(width, height int) string {
 		}
 		selected := i == m.cursor && m.focus == focusSide
 		line := fmt.Sprintf("%s %s %s%s%s", mark, glyph, nameStyle.Render("@"+r.bot.Slug), open, busy)
-		if !selected && r.bot.Title != "" {
-			line += "  " + mutedStyle.Render(r.bot.Title)
-		}
 		if r.pending > 0 {
 			line += fmt.Sprintf("  %d", r.pending)
 		}
@@ -508,7 +514,7 @@ func (m Model) sidebarView(width, height int) string {
 			line = sel.Render(line)
 		}
 		fmt.Fprintln(&b, line)
-		if i == m.cursor {
+		if r.bot.Title != "" {
 			title := mutedStyle.Render("     " + r.bot.Title)
 			if selected {
 				title = sel.Render(title)
