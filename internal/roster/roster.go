@@ -53,6 +53,8 @@ type SpawnOpts struct {
 	KeepAlive   bool
 	MaxBots     int
 	SoulMax     int
+	// SoulBody seeds soul.md when set; otherwise the generic seed is used.
+	SoulBody string
 }
 
 func ValidSlug(slug string) bool {
@@ -253,11 +255,13 @@ func Spawn(root string, opts SpawnOpts) (Bot, []string, error) {
 	}
 
 	soulPath := SoulPath(root, opts.Slug)
-	created, err := soul.WriteSeed(soulPath, opts.Slug)
-	if err != nil {
+	if opts.SoulBody != "" && opts.CloneFrom == "" {
+		if err := os.WriteFile(soulPath, []byte(opts.SoulBody), 0o600); err != nil {
+			return Bot{}, nil, err
+		}
+	} else if _, err := soul.WriteSeed(soulPath, opts.Slug); err != nil {
 		return Bot{}, nil, err
 	}
-	_ = created
 
 	body, err := soul.Read(soulPath, opts.SoulMax)
 	if err != nil {

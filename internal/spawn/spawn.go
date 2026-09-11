@@ -9,6 +9,7 @@ import (
 
 	"github.com/hocoder-agents/crush-bot/internal/config"
 	"github.com/hocoder-agents/crush-bot/internal/crush"
+	"github.com/hocoder-agents/crush-bot/internal/preset"
 	"github.com/hocoder-agents/crush-bot/internal/protocol"
 	"github.com/hocoder-agents/crush-bot/internal/roster"
 	"github.com/hocoder-agents/crush-bot/internal/sandbox"
@@ -24,6 +25,8 @@ type Opts struct {
 	Coder       bool
 	Sandbox     string
 	KeepAlive   bool
+	// Soul seeds soul.md when set; empty means the generic seed.
+	Soul string
 }
 
 type Result struct {
@@ -50,6 +53,22 @@ func Create(root string, cfg config.Config, o Opts) (Result, error) {
 			return out, fmt.Errorf("%w (or pass --sandbox-off)", err)
 		}
 	}
+	if o.CloneFrom == "" {
+		if entry, soulBody, ok := preset.Get(o.Slug); ok {
+			if o.Soul == "" {
+				o.Soul = soulBody
+			}
+			if o.Title == "" {
+				o.Title = entry.Title
+			}
+			if o.Description == "" {
+				o.Description = entry.Description
+			}
+			if !o.Coder {
+				o.Coder = entry.Coder
+			}
+		}
+	}
 	bot, warns, err := roster.Spawn(root, roster.SpawnOpts{
 		Slug:        o.Slug,
 		Title:       o.Title,
@@ -62,6 +81,7 @@ func Create(root string, cfg config.Config, o Opts) (Result, error) {
 		KeepAlive:   o.KeepAlive,
 		MaxBots:     cfg.MaxBots,
 		SoulMax:     cfg.SoulMaxBytes,
+		SoulBody:    o.Soul,
 	})
 	if err != nil {
 		return out, err

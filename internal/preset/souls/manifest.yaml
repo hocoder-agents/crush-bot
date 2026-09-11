@@ -1,0 +1,11 @@
+presets:
+  - slug: researcher
+    title: Researcher
+    description: digs through docs and code; answers with sources
+  - slug: coder
+    title: Coder
+    description: writes and runs code in a sandbox
+    coder: true
+  - slug: reviewer
+    title: Reviewer
+    description: reviews diffs and designs; comments with file:line

@@ -272,3 +272,49 @@ func TestKeepaliveStartStop(t *testing.T) {
 	}
 	run(env, []string{"keepalive", "stop", "hot"})
 }
+
+func TestPresetsAndCrew(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("CRUSHBOT_HOME", filepath.Join(dir, "home"))
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(dir, "cfg"))
+	installFakeCrush(t)
+	var out, errb bytes.Buffer
+	env := IO{Out: &out, Err: &errb, In: strings.NewReader("")}
+	if code := run(env, []string{"init"}); code != 0 {
+		t.Fatal(errb.String())
+	}
+	out.Reset()
+	if code := run(env, []string{"presets"}); code != 0 {
+		t.Fatalf("presets %d %s %s", code, out.String(), errb.String())
+	}
+	for _, want := range []string{"researcher", "coder", "reviewer"} {
+		if !strings.Contains(out.String(), want) {
+			t.Fatalf("presets missing %s: %s", want, out.String())
+		}
+	}
+	out.Reset()
+	errb.Reset()
+	if code := run(env, []string{"crew"}); code != 0 {
+		t.Fatalf("crew %d %s %s", code, out.String(), errb.String())
+	}
+	for _, want := range []string{"researcher", "coder", "reviewer"} {
+		if !strings.Contains(out.String(), "spawned "+want) {
+			t.Fatalf("crew missing %s: %s %s", want, out.String(), errb.String())
+		}
+	}
+	soulBody, err := os.ReadFile(filepath.Join(dir, "home", "bots", "researcher", "soul.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(soulBody), "Researcher") {
+		t.Fatalf("preset soul not seeded: %s", soulBody)
+	}
+	out.Reset()
+	errb.Reset()
+	if code := run(env, []string{"crew"}); code != 0 {
+		t.Fatalf("crew again %d %s %s", code, out.String(), errb.String())
+	}
+	if !strings.Contains(out.String(), "already have @researcher") {
+		t.Fatalf("crew rerun: %s %s", out.String(), errb.String())
+	}
+}

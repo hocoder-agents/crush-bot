@@ -58,6 +58,9 @@ The unit’s `PATH` is the directory that contains `crushbot`, then `/usr/local/
 ### Roster
 
 ```bash
+crushbot presets                       # list shipped default bots
+crushbot crew                          # spawn every missing default bot
+
 crushbot spawn researcher --title Researcher
 crushbot spawn coder --title Coder --coder          # bash/edit, sandboxed on Linux
 crushbot list
@@ -67,6 +70,8 @@ crushbot hide researcher
 crushbot clone researcher intern
 crushbot delete intern --yes
 ```
+
+Three default bots ship with crushbot: `researcher`, `coder` (`--coder`), and `reviewer`. Their souls live in `internal/preset/souls/`; spawning a preset slug seeds that soul plus its title/role, and `--title`/`--description`/`--coder` flags override.
 
 `spawn` with no flags in a TTY opens a Huh form. `soul.md` is seeded once and never overwritten.
 

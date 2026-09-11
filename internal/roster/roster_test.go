@@ -53,6 +53,19 @@ func TestSpawnSeedOnce(t *testing.T) {
 	}
 }
 
+func TestSpawnSoulBody(t *testing.T) {
+	root := t.TempDir()
+	os.MkdirAll(filepath.Join(root, "bots"), 0o700)
+	_, _, err := Spawn(root, SpawnOpts{Slug: "a", SoulBody: "custom soul"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := soul.Read(SoulPath(root, "a"), 0)
+	if body != "custom soul" {
+		t.Fatalf("got %q", body)
+	}
+}
+
 func TestSpawnDuplicate(t *testing.T) {
 	root := t.TempDir()
 	os.MkdirAll(filepath.Join(root, "bots"), 0o700)
