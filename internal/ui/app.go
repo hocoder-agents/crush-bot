@@ -485,7 +485,11 @@ func (m Model) sidebarView(width, height int) string {
 		if r.busy || (m.chatBusy && m.chatSlug == r.bot.Slug) {
 			busy = " busy"
 		}
-		line := fmt.Sprintf("%s @%s%s%s", mark, r.bot.Slug, open, busy)
+		glyph := "  "
+		if r.bot.Slug == "sophie" {
+			glyph = "💜"
+		}
+		line := fmt.Sprintf("%s %s @%s  %s%s%s", mark, glyph, r.bot.Slug, r.bot.Title, open, busy)
 		if r.pending > 0 {
 			line += fmt.Sprintf("  %d", r.pending)
 		}
