@@ -3,6 +3,7 @@ package ui
 import (
 	"context"
 	"fmt"
+	"hash/fnv"
 	"strings"
 	"time"
 
@@ -37,20 +38,70 @@ func (m *Model) reloadGroupChat() {
 	if m.chatGroup == "" {
 		return
 	}
-	var b strings.Builder
 	lines, _ := group.ReadTranscript(m.home, m.chatGroup)
-	for _, l := range lines {
-		kind := l.Kind
-		if l.Pass {
-			kind = "pass"
-		}
-		fmt.Fprintf(&b, "%s  %s  %s\n", kind, l.From, l.Body)
+	body := renderRoomTranscript(lines)
+	if body == "" {
+		body = mutedStyle.Render("(empty room — type a line to start a round)") + "\n"
 	}
-	if b.Len() == 0 {
-		b.WriteString("(empty room — type a line to start a round)\n")
-	}
-	m.vp.SetContent(b.String())
+	m.vp.SetContent(body)
 	m.vp.GotoBottom()
+}
+
+// roomPalette gives each member a stable color so conversations read as
+// speakers, not walls of text.
+var roomPalette = []string{
+	"205", // pink
+	"212", // orchid pink
+	"39",  // cyan
+	"170", // violet
+	"69",  // blue
+	"208", // orange
+	"141", // light purple
+	"72",  // teal
+}
+
+func memberStyle(slug string) lipgloss.Style {
+	if slug == "sophie" {
+		// The orchestrator keeps the brand lavender.
+		return lipgloss.NewStyle().Foreground(lavender).Bold(true)
+	}
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(slug))
+	return lipgloss.NewStyle().Foreground(lipgloss.Color(roomPalette[h.Sum32()%uint32(len(roomPalette))])).Bold(true)
+}
+
+func userStyle() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Bold(true)
+}
+
+// renderRoomTranscript lays out a room log: round dividers, colored
+// speaker names, dimmed passes and system notes.
+func renderRoomTranscript(lines []group.Line) string {
+	var b strings.Builder
+	prev := -1
+	for _, l := range lines {
+		if l.Round != prev {
+			prev = l.Round
+			if l.Round > 0 && b.Len() > 0 {
+				fmt.Fprintln(&b, mutedStyle.Render(fmt.Sprintf("──  round %d  ──", l.Round)))
+			}
+		}
+		switch {
+		case l.Kind == "system":
+			fmt.Fprintf(&b, "%s\n", mutedStyle.Render("   ⚠ "+l.Body))
+		case l.Pass || l.Kind == "pass":
+			note := "passed"
+			if l.Body != "" && l.Body != "PASS" {
+				note = l.Body
+			}
+			fmt.Fprintf(&b, "%s\n", mutedStyle.Render("   · "+l.From+" "+note))
+		case l.From == "user":
+			fmt.Fprintf(&b, "%s  %s\n", userStyle().Render("you"), l.Body)
+		default:
+			fmt.Fprintf(&b, "%s  %s\n", memberStyle(l.From).Render("@"+l.From), l.Body)
+		}
+	}
+	return b.String()
 }
 
 func (m Model) groupView(width, height int) string {
