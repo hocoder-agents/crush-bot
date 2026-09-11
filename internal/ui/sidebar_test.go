@@ -5,7 +5,9 @@ import (
 	"strings"
 	"testing"
 
+	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/hocoder-agents/crush-bot/internal/group"
 	"github.com/hocoder-agents/crush-bot/internal/roster"
@@ -273,5 +275,24 @@ func TestFormInputsFocusable(t *testing.T) {
 	m = mi.(Model)
 	if m.spawnForm.slug.Value() != "x" {
 		t.Fatalf("typing into slug failed: %q", m.spawnForm.slug.Value())
+	}
+}
+
+func TestSpinnerRendersInViews(t *testing.T) {
+	m := Model{
+		home:       t.TempDir(),
+		spinnerBot: spinner.New(spinner.WithSpinner(spinner.Dot), spinner.WithStyle(lipgloss.NewStyle().Foreground(lavender))),
+		rows:       []row{{bot: roster.Bot{Slug: "diana", Title: "Coder"}, busy: true}},
+		chatSlug:   "diana",
+		chatBusy:   true,
+	}
+	out := m.sidebarView(24, 10)
+	if !strings.ContainsAny(out, "⣾⣽⣻⡿⡿⡾⡟⡾⡷⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏") {
+		t.Fatalf("no braille spinner in busy bot row:\n%s", out)
+	}
+	m.chatGroup = "review"
+	out2 := m.crushView(40, 10)
+	if !strings.Contains(out2, "thinking") {
+		t.Fatalf("chat head missing thinking:\n%s", out2)
 	}
 }

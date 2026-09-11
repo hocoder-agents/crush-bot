@@ -63,7 +63,7 @@ func (m Model) groupView(width, height int) string {
 	}
 	head := nameStyle.Render("@"+m.chatGroup) + "  " + mutedStyle.Render(strings.Join(members, "  "))
 	if m.groupBusy {
-		head += "  " + mutedStyle.Render("round running…")
+		head += "  " + m.spinnerGroup.View() + " " + mutedStyle.Render("thinking")
 	}
 	return padStyle(width).Render(strings.Join([]string{head, m.vp.View(), m.in.View()}, "\n"))
 }

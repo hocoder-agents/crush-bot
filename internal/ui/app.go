@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"charm.land/bubbles/v2/spinner"
 	"charm.land/bubbles/v2/textinput"
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
@@ -72,14 +73,18 @@ type Model struct {
 	disbandPending string
 	spawnForm      spawnFormState
 	groupForm      groupFormState
+	spinnerBot     spinner.Model
+	spinnerGroup   spinner.Model
 }
 
 func New(home string) Model {
 	m := Model{
-		home:  home,
-		focus: focusSide,
-		in:    newChatInput(),
-		vp:    viewport.New(viewport.WithWidth(40), viewport.WithHeight(10)),
+		home:         home,
+		focus:        focusSide,
+		in:           newChatInput(),
+		vp:           viewport.New(viewport.WithWidth(40), viewport.WithHeight(10)),
+		spinnerBot:   spinner.New(spinner.WithSpinner(spinner.Dot), spinner.WithStyle(lipgloss.NewStyle().Foreground(lavender))),
+		spinnerGroup: spinner.New(spinner.WithSpinner(spinner.Dot), spinner.WithStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("205")))),
 	}
 	m.reload()
 	return m
@@ -137,7 +142,9 @@ func (m *Model) reloadInbox() {
 	m.inbox.clamp()
 }
 
-func (m Model) Init() tea.Cmd { return nil }
+func (m Model) Init() tea.Cmd {
+	return tea.Batch(m.spinnerBot.Tick, m.spinnerGroup.Tick)
+}
 
 type spawnDoneMsg struct {
 	err  error
@@ -181,6 +188,11 @@ func layout(width, height int) (sideW, crushW, bodyH int) {
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case spinner.TickMsg:
+		var c1, c2 tea.Cmd
+		m.spinnerBot, c1 = m.spinnerBot.Update(msg)
+		m.spinnerGroup, c2 = m.spinnerGroup.Update(msg)
+		return m, tea.Batch(c1, c2)
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 		m.sizeChat()
@@ -587,7 +599,7 @@ func (m Model) sidebarView(width, height int) string {
 		}
 		busy := ""
 		if r.busy || (m.chatBusy && m.chatSlug == r.bot.Slug) {
-			busy = " busy"
+			busy = " " + m.spinnerBot.View()
 		}
 		glyph := "  "
 		if r.bot.Slug == "sophie" {
@@ -620,6 +632,9 @@ func (m Model) sidebarView(width, height int) string {
 			}
 			selected := i == m.cursor && m.focus == focusSide
 			line := fmt.Sprintf("%s %s %s", mark, glyphPlaceholder, nameStyle.Render("@"+g.ID))
+			if m.groupBusy && m.chatGroup == g.ID {
+				line += " " + m.spinnerGroup.View()
+			}
 			if selected {
 				line = sel.Render(line)
 			}
@@ -665,7 +680,7 @@ func (m Model) crushView(width, height int) string {
 	}
 	head := nameStyle.Render("@"+m.chatSlug) + "  " + mutedStyle.Render("session")
 	if m.chatBusy {
-		head += "  " + mutedStyle.Render("running…")
+		head += "  " + m.spinnerBot.View() + " " + mutedStyle.Render("thinking")
 	}
 	return pad.Render(strings.Join([]string{head, m.vp.View(), m.in.View()}, "\n"))
 }
