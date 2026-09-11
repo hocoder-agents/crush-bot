@@ -113,6 +113,13 @@ func MessageBot(id Identity, target, message string) CallResult {
 	if err != nil {
 		return CallResult{Reason: "missing_config", Error: "no turn context; use crushbot say/chat/daemon"}
 	}
+	// Room rounds are public by design: a DM mid-round continues the
+	// conversation invisibly (daemon wakes the target later, outside the
+	// transcript). Block it with a nudge instead of letting the room
+	// silently empty out.
+	if turn.Kind == "group_round" {
+		return CallResult{Reason: "room_dm_blocked", Error: "you are in a group room; DMs are invisible to the room - post with group_say"}
+	}
 	hop := turn.InboundHop + 1
 	if hop > turn.MaxHops && turn.MaxHops > 0 {
 		return CallResult{Reason: "hop_limit", Error: "hop exceeds max"}

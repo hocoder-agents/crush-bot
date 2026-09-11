@@ -20,7 +20,7 @@ func TailPrompt(home, id string, n int) string {
 		lines = lines[len(lines)-n:]
 	}
 	var b strings.Builder
-	b.WriteString("You are in a crushbot group room. Room discussion belongs in public group_say lines - deliberate here so the operator sees it; message_bot is only for private side channels and is not on the transcript. group_pass to skip.\n\nTranscript:\n")
+	b.WriteString("You are in a crushbot group room. Room discussion belongs in public group_say lines - deliberate here so the operator sees it; message_bot is disabled while the room is in session and anything a room member must see has to be a group_say line. group_pass to skip.\n\nTranscript:\n")
 	for _, l := range lines {
 		b.WriteString(l.From + " [" + l.Kind + "]: " + l.Body + "\n")
 	}

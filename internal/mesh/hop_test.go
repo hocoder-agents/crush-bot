@@ -149,3 +149,35 @@ func TestNoTurn(t *testing.T) {
 		t.Fatalf("%+v", r)
 	}
 }
+
+func TestMessageBotBlockedDuringRound(t *testing.T) {
+	root := t.TempDir()
+	os.MkdirAll(filepath.Join(root, "bots"), 0o700)
+	a, _, err := roster.Spawn(root, roster.SpawnOpts{Slug: "alpha"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	home := roster.Home(root, "alpha")
+	_ = os.WriteFile(filepath.Join(home, "turn.json"), []byte(`{"kind":"group_round","group_id":"review"}`), 0o600)
+	var b roster.Bot
+	if _, _, err := roster.Spawn(root, roster.SpawnOpts{Slug: "beta"}); err != nil {
+		t.Fatal(err)
+	}
+	protocol.Write(protocol.Options{Root: root, Bot: a, Teammates: []roster.Bot{a, b}})
+	tok, _ := os.ReadFile(filepath.Join(home, ".mcp_token"))
+	id := Identity{
+		Root:    root,
+		Bot:     "alpha",
+		DataDir: filepath.Join(home, ".crush"),
+		Cwd:     home,
+		Token:   strings.TrimSpace(string(tok)),
+	}
+	os.MkdirAll(id.DataDir, 0o700)
+	res := MessageBot(id, "beta", "psst")
+	if res.Reason != "room_dm_blocked" {
+		t.Fatalf("want room_dm_blocked, got %+v", res)
+	}
+	if res.Error == "" || !strings.Contains(res.Error, "group_say") {
+		t.Fatalf("error should nudge to group_say: %+v", res)
+	}
+}
