@@ -41,6 +41,22 @@ func (m Model) paletteActions() []action {
 			}
 			return m2, nil
 		}},
+		{label: "create group", hint: "", run: func(m Model) (tea.Model, tea.Cmd) {
+			wiz := &groupWizard{home: m.home}
+			return m, tea.Exec(wiz, func(err error) tea.Msg {
+				return groupCreatedMsg{id: wiz.id, err: err}
+			})
+		}},
+		{label: "disband room under cursor", hint: "", run: func(m Model) (tea.Model, tea.Cmd) {
+			g, ok := m.selectedGroup()
+			if !ok {
+				m.status = "select a room to disband"
+				return m, nil
+			}
+			m.disbandPending = g.ID
+			m.status = "disband @" + g.ID + "? press D to confirm"
+			return m, nil
+		}},
 		{label: "doctor --check", hint: "", run: func(m Model) (tea.Model, tea.Cmd) {
 			return m, tea.Exec(&doctorWizard{}, func(err error) tea.Msg {
 				return doctorDoneMsg{err: err}
