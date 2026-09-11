@@ -30,10 +30,12 @@ const (
 )
 
 var (
-	titleStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("205"))
-	mutedStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-	keyStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("212"))
-	selStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("229")).Bold(true)
+	titleStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("205"))
+	mutedStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
+	keyStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("212"))
+	nameStyle  = lipgloss.NewStyle().Bold(true)
+	// Selection is a background wash, not a font color change.
+	selStyle    = lipgloss.NewStyle().Background(lipgloss.Color("#3A3455"))
 	sideStyle   = lipgloss.NewStyle().Padding(0, 1)
 	helpStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Padding(0, 1)
 	divStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("238"))
@@ -472,6 +474,11 @@ func (m Model) sidebarView(width, height int) string {
 		fmt.Fprintln(&b, "No bots yet.")
 		fmt.Fprintln(&b, mutedStyle.Render("press n to spawn"))
 	}
+	inner := width - 2 // sideStyle horizontal padding
+	if inner < 1 {
+		inner = 1
+	}
+	sel := selStyle.Width(inner)
 	for i, r := range m.rows {
 		mark := " "
 		if i == m.cursor {
@@ -489,14 +496,25 @@ func (m Model) sidebarView(width, height int) string {
 		if r.bot.Slug == "sophie" {
 			glyph = "💜"
 		}
-		line := fmt.Sprintf("%s %s @%s  %s%s%s", mark, glyph, r.bot.Slug, r.bot.Title, open, busy)
+		selected := i == m.cursor && m.focus == focusSide
+		line := fmt.Sprintf("%s %s %s%s%s", mark, glyph, nameStyle.Render("@"+r.bot.Slug), open, busy)
+		if !selected && r.bot.Title != "" {
+			line += "  " + mutedStyle.Render(r.bot.Title)
+		}
 		if r.pending > 0 {
 			line += fmt.Sprintf("  %d", r.pending)
 		}
-		if i == m.cursor && m.focus == focusSide {
-			line = selStyle.Render(line)
+		if selected {
+			line = sel.Render(line)
 		}
 		fmt.Fprintln(&b, line)
+		if i == m.cursor {
+			title := mutedStyle.Render("     " + r.bot.Title)
+			if selected {
+				title = sel.Render(title)
+			}
+			fmt.Fprintln(&b, title)
+		}
 	}
 	return sideStyle.Width(width).Height(height).MaxHeight(height).MaxWidth(width).Render(b.String())
 }
