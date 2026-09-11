@@ -3,6 +3,7 @@
 package sandbox
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -127,6 +128,9 @@ func rwPaths(bot roster.Bot, root string) []string {
 		_ = os.WriteFile(needs, nil, 0o600)
 	}
 	rw := []string{home, "/tmp", needs}
+	if gid := roundGroupID(home); gid != "" {
+		rw = append(rw, filepath.Join(root, "groups", gid))
+	}
 	if bot.Project != "" {
 		rw = append(rw, bot.Project)
 	}
@@ -140,6 +144,23 @@ func rwPaths(bot roster.Bot, root string) []string {
 		rw = append(rw, pend)
 	}
 	return rw
+}
+
+// roundGroupID reads the bot's turn.json for an active group round id.
+// Duplicated from internal/crush to avoid an import cycle (crush uses
+// sandbox.Wrap); only the group_id field is needed here.
+func roundGroupID(home string) string {
+	b, err := os.ReadFile(filepath.Join(home, "turn.json"))
+	if err != nil {
+		return ""
+	}
+	var t struct {
+		GroupID *string `json:"group_id"`
+	}
+	if json.Unmarshal(b, &t) != nil || t.GroupID == nil {
+		return ""
+	}
+	return *t.GroupID
 }
 
 func walkDirs(path string) []string {

@@ -167,6 +167,11 @@ func BwrapArgs(crushBin string, crushArgs []string, bot roster.Bot, root string)
 	for _, pair := range crushHostDirPairs(sandboxHome) {
 		out = append(out, "--ro-bind-try", pair[0], pair[1])
 	}
+	if gid := roundGroupID(home); gid != "" {
+		// group_say and the round collector write the room dir.
+		dir := filepath.Join(root, "groups", gid)
+		out = append(out, "--bind", dir, dir)
+	}
 	bots, _ := roster.List(root, true)
 	for _, b := range bots {
 		if b.Slug == bot.Slug {
