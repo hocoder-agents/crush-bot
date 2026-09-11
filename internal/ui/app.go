@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"charm.land/bubbles/v2/spinner"
 	"charm.land/bubbles/v2/textinput"
@@ -142,8 +143,14 @@ func (m *Model) reloadInbox() {
 	m.inbox.clamp()
 }
 
+type refreshTickMsg struct{}
+
+func refreshTick() tea.Cmd {
+	return tea.Tick(500*time.Millisecond, func(time.Time) tea.Msg { return refreshTickMsg{} })
+}
+
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(m.spinnerBot.Tick, m.spinnerGroup.Tick)
+	return tea.Batch(m.spinnerBot.Tick, m.spinnerGroup.Tick, refreshTick())
 }
 
 type spawnDoneMsg struct {
@@ -188,6 +195,11 @@ func layout(width, height int) (sideW, crushW, bodyH int) {
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case refreshTickMsg:
+		// Roster busy flags and pending counts go stale without polling;
+		// this is what makes the thinking spinners appear for daemon wakes.
+		m.reload()
+		return m, refreshTick()
 	case spinner.TickMsg:
 		var c1, c2 tea.Cmd
 		m.spinnerBot, c1 = m.spinnerBot.Update(msg)
@@ -408,11 +420,11 @@ func (m Model) handleMouse(kind string, mouse tea.Mouse) (tea.Model, tea.Cmd) {
 		m.focus = focusSide
 		if kind == "click" {
 			idx := mouse.Y - 4 // title, subtitle, status, blank
-			if idx >= 0 {
-				if idx < 2*len(m.rows) {
-					m.cursor = idx / 2 // two lines per bot: name + title
+			if idx >= 1 {      // idx 0 is the agents heading
+				if idx <= 2*len(m.rows) {
+					m.cursor = (idx - 1) / 2 // two lines per bot: name + title
 				} else if len(m.groups) > 0 {
-					off := idx - 2*len(m.rows) // 0 = groups heading, then two lines per room
+					off := idx - 2*len(m.rows) - 1 // 0 = groups heading, then two lines per room
 					if off >= 1 {
 						if k := (off - 1) / 2; k < len(m.groups) {
 							m.cursor = len(m.rows) + k
@@ -579,6 +591,7 @@ func (m Model) sidebarView(width, height int) string {
 	fmt.Fprintln(&b, mutedStyle.Render("Charm Crush Powered Bot Mesh"))
 	fmt.Fprintln(&b, mutedStyle.Render(m.status))
 	fmt.Fprintln(&b)
+	fmt.Fprintln(&b, mutedStyle.Render("agents"))
 	if len(m.rows) == 0 {
 		fmt.Fprintln(&b, "No bots yet.")
 		fmt.Fprintln(&b, mutedStyle.Render("press n to spawn"))
