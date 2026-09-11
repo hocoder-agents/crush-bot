@@ -134,3 +134,26 @@ func TestCrushHostDirPairsRebaseIntoSandboxHome(t *testing.T) {
 		t.Fatalf("missing /etc/crush pair:\n%s", joined)
 	}
 }
+
+func TestRoundGroupDirBoundRW(t *testing.T) {
+	root := t.TempDir()
+	bot := roster.Bot{Slug: "diana", Tools: roster.Tools{Bash: true, Edit: true}}
+	home := roster.Home(root, bot.Slug)
+	if err := os.MkdirAll(home, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	gid := "review"
+	if err := os.WriteFile(filepath.Join(home, "turn.json"), []byte(`{"kind":"group_round","group_id":"`+gid+`"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	args := BwrapArgs("/usr/bin/crush", []string{"run", "hi"}, bot, root)
+	joined := strings.Join(args, " ")
+	dir := filepath.Join(root, "groups", gid)
+	if !strings.Contains(joined, "--bind "+dir+" "+dir) {
+		t.Fatalf("room dir not RW-bound:\n%s", joined)
+	}
+	// landlock path
+	if got := roundGroupID(home); got != gid {
+		t.Fatalf("roundGroupID = %q", got)
+	}
+}
