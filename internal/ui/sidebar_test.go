@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/hocoder-agents/crush-bot/internal/group"
 	"github.com/hocoder-agents/crush-bot/internal/roster"
 )
 
@@ -90,5 +91,20 @@ func TestCrushViewPaddedFromDivider(t *testing.T) {
 		if !strings.HasPrefix(l, " ") {
 			t.Fatalf("transcript line not padded: %q", l)
 		}
+	}
+}
+
+func TestSidebarRoomsSection(t *testing.T) {
+	home := t.TempDir()
+	if err := roster.Save(home, roster.Bot{Slug: "diana", Title: "Coder"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := group.Save(home, group.Group{ID: "review", Members: []string{"diana", "natasha"}}); err != nil {
+		t.Fatal(err)
+	}
+	m := Model{home: home, groups: []group.Group{{ID: "review", Members: []string{"diana", "natasha"}}}}
+	out := m.sidebarView(24, 20)
+	if !strings.Contains(out, "groups") || !strings.Contains(out, "@review") {
+		t.Fatalf("rooms missing from sidebar:\n%s", out)
 	}
 }

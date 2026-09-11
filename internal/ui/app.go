@@ -16,18 +16,20 @@ import (
 	"github.com/hocoder-agents/crush-bot/internal/crush"
 	"github.com/hocoder-agents/crush-bot/internal/daemon"
 	"github.com/hocoder-agents/crush-bot/internal/envelope"
+	"github.com/hocoder-agents/crush-bot/internal/group"
 	"github.com/hocoder-agents/crush-bot/internal/roster"
 	"github.com/hocoder-agents/crush-bot/internal/spawn"
 )
 
 const (
-	helpRows   = 1
-	dividerW   = 1
-	minSideW   = 16
-	maxSideW   = 28
-	focusSide  = 0
-	focusChat  = 1
-	focusInbox = 2
+	helpRows         = 1
+	dividerW         = 1
+	minSideW         = 16
+	maxSideW         = 28
+	focusSide        = 0
+	glyphPlaceholder = "  "
+	focusChat        = 1
+	focusInbox       = 2
 )
 
 var (
@@ -63,6 +65,9 @@ type Model struct {
 	vp            viewport.Model
 	showInbox     bool
 	inbox         inboxState
+	groups        []group.Group
+	chatGroup     string
+	groupBusy     bool
 }
 
 func New(home string) Model {
@@ -101,7 +106,12 @@ func (m *Model) reload() {
 		}
 		m.rows = append(m.rows, row{bot: b, pending: len(envs), busy: busy})
 	}
-	if m.cursor >= len(m.rows) {
+	if cfg, err := config.Load(config.ResolvePaths()); err == nil && group.Enabled(cfg) {
+		m.groups, _ = group.List(m.home)
+	} else {
+		m.groups = nil
+	}
+	if m.cursor >= m.flatTotal() {
 		m.cursor = 0
 	}
 	if daemon.Live(m.home) {
@@ -177,6 +187,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.chatSlug != "" {
 			m.reloadChat()
 		}
+		if m.chatGroup != "" {
+			m.reloadGroupChat()
+		}
+	case groupDoneMsg:
+		m.chatBusy = false
+		m.groupBusy = false
+		m.reload()
+		m.reloadGroupChat()
+		if msg.err != nil {
+			m.status = "round failed: " + msg.err.Error()
+		} else {
+			m.status = "round done @" + m.chatGroup
+		}
+		return m, m.in.Focus()
 	case sayDoneMsg:
 		m.chatBusy = false
 		m.reload()
@@ -232,6 +256,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.focus = focusChat
 				m.reloadChat()
 			}
+			if m.chatGroup != "" {
+				m.showInbox = false
+				m.focus = focusChat
+				m.reloadGroupChat()
+			}
 			return m, nil
 		}
 		if m.focus == focusChat {
@@ -281,8 +310,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "j", "down":
 			if m.focus == focusInbox {
 				m.inbox.move(1)
-			} else if len(m.rows) > 0 {
-				m.cursor = (m.cursor + 1) % len(m.rows)
+			} else if m.flatTotal() > 0 {
+				m.cursor = (m.cursor + 1) % m.flatTotal()
 				if m.showInbox {
 					m.reloadInbox()
 				}
@@ -290,8 +319,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "k", "up":
 			if m.focus == focusInbox {
 				m.inbox.move(-1)
-			} else if len(m.rows) > 0 {
-				m.cursor = (m.cursor - 1 + len(m.rows)) % len(m.rows)
+			} else if m.flatTotal() > 0 {
+				m.cursor = (m.cursor - 1 + m.flatTotal()) % m.flatTotal()
 				if m.showInbox {
 					m.reloadInbox()
 				}
@@ -318,6 +347,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.chatSlug != "" {
 				m.reloadChat()
 			}
+			if m.chatGroup != "" {
+				m.reloadGroupChat()
+			}
 		case "n":
 			wiz := &spawnWizard{home: m.home}
 			return m, tea.Exec(wiz, func(err error) tea.Msg {
@@ -339,8 +371,17 @@ func (m Model) handleMouse(kind string, mouse tea.Mouse) (tea.Model, tea.Cmd) {
 		m.focus = focusSide
 		if kind == "click" {
 			idx := mouse.Y - 4 // title, subtitle, status, blank
-			if idx >= 0 && idx < len(m.rows) {
-				m.cursor = idx
+			if idx >= 0 {
+				if idx < 2*len(m.rows) {
+					m.cursor = idx / 2 // two lines per bot: name + title
+				} else if len(m.groups) > 0 {
+					off := idx - 2*len(m.rows) // 0 = groups heading, then two lines per room
+					if off >= 1 {
+						if k := (off - 1) / 2; k < len(m.groups) {
+							m.cursor = len(m.rows) + k
+						}
+					}
+				}
 			}
 		}
 		return m, nil
@@ -364,6 +405,9 @@ func (m Model) handleMouse(kind string, mouse tea.Mouse) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) openInbox() (tea.Model, tea.Cmd) {
+	if m.cursor >= len(m.rows) {
+		return m, nil
+	}
 	if len(m.rows) == 0 {
 		return m, nil
 	}
@@ -416,11 +460,22 @@ func (m *Model) reloadChat() {
 }
 
 func (m Model) openSelected() (tea.Model, tea.Cmd) {
+	if g, ok := m.selectedGroup(); ok {
+		m.showInbox = false
+		m.chatSlug = ""
+		m.chatGroup = g.ID
+		m.focus = focusChat
+		m.sizeChat()
+		m.reloadGroupChat()
+		m.status = "chat @" + g.ID
+		return m, m.in.Focus()
+	}
 	if len(m.rows) == 0 {
 		return m, nil
 	}
 	bot := m.rows[m.cursor].bot
 	m.showInbox = false
+	m.chatGroup = ""
 	m.chatSlug = bot.Slug
 	m.focus = focusChat
 	m.sizeChat()
@@ -431,11 +486,19 @@ func (m Model) openSelected() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) sendChat() (tea.Model, tea.Cmd) {
-	if m.chatBusy || m.chatSlug == "" {
+	if m.chatBusy {
 		return m, nil
 	}
 	line := strings.TrimSpace(m.in.Value())
 	if line == "" {
+		return m, nil
+	}
+	if m.chatGroup != "" {
+		m.in.SetValue("")
+		m.chatBusy = true
+		return m, m.sendGroup(line)
+	}
+	if m.chatSlug == "" {
 		return m, nil
 	}
 	var bot roster.Bot
@@ -522,12 +585,36 @@ func (m Model) sidebarView(width, height int) string {
 			fmt.Fprintln(&b, title)
 		}
 	}
+	if len(m.groups) > 0 {
+		fmt.Fprintln(&b, mutedStyle.Render("groups"))
+		for gi, g := range m.groups {
+			i := len(m.rows) + gi
+			mark := " "
+			if i == m.cursor {
+				mark = "▸"
+			}
+			selected := i == m.cursor && m.focus == focusSide
+			line := fmt.Sprintf("%s %s %s", mark, glyphPlaceholder, nameStyle.Render("@"+g.ID))
+			if selected {
+				line = sel.Render(line)
+			}
+			fmt.Fprintln(&b, line)
+			title := mutedStyle.Render(fmt.Sprintf("     %d members", len(g.Members)))
+			if selected {
+				title = sel.Render(title)
+			}
+			fmt.Fprintln(&b, title)
+		}
+	}
 	return sideStyle.Width(width).Height(height).MaxHeight(height).MaxWidth(width).Render(b.String())
 }
 
 func (m Model) rightView(width, height int) string {
 	if m.showInbox && m.inbox.slug != "" {
 		return renderInbox(m.inbox, width, height)
+	}
+	if m.chatGroup != "" {
+		return m.groupView(width, height)
 	}
 	return m.crushView(width, height)
 }
