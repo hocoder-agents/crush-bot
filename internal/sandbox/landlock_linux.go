@@ -78,7 +78,7 @@ func applyLandlock(bot roster.Bot, root, crushBin, self string) error {
 	fd := int(r1)
 	defer unix.Close(fd)
 
-	ro := []string{"/usr", "/bin", "/lib", "/lib64", "/etc/ssl", "/etc/resolv.conf", "/proc", "/dev", root}
+	ro := []string{"/usr", "/bin", "/lib", "/lib64", "/etc/ssl", "/etc/ca-certificates", "/etc/pki", "/etc/resolv.conf", "/proc", "/dev", root}
 	ro = append(ro, crushRuntimePaths(crushBin)...)
 	ro = append(ro, crushHostPaths()...)
 	if self != "" {

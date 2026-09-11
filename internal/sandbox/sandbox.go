@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"syscall"
 
 	"github.com/hocoder-agents/crush-bot/internal/roster"
@@ -85,6 +86,43 @@ func ExecLandlocked(crushBin, root, slug string, crushArgs []string) error {
 	return syscall.Exec(abs, argv, os.Environ())
 }
 
+// crushHostDirPairs maps Crush's global config/data/cache dirs into the bwrap
+// sandbox. Bwrap remaps HOME to a tmpfs sandbox-home, so a dir under the real
+// HOME must also appear at the same relative path under sandbox HOME or Crush
+// finds no providers. Dirs outside HOME (XDG vars, /etc) bind in place.
+func crushHostDirPairs(sandboxHome string) [][2]string {
+	home, _ := os.UserHomeDir()
+	seen := map[string]bool{}
+	var out [][2]string
+	inHome := func(p string) bool {
+		return home != "" && strings.HasPrefix(p, home+string(filepath.Separator))
+	}
+	add := func(src string, under bool) {
+		if src == "" || seen[src] {
+			return
+		}
+		seen[src] = true
+		dst := src
+		if under && sandboxHome != "" {
+			dst = filepath.Join(sandboxHome, strings.TrimPrefix(src, home+string(filepath.Separator)))
+		}
+		out = append(out, [2]string{src, dst})
+	}
+	for _, e := range [][2]string{
+		{"XDG_CONFIG_HOME", ".config"},
+		{"XDG_DATA_HOME", ".local/share"},
+		{"XDG_CACHE_HOME", ".cache"},
+	} {
+		if v := os.Getenv(e[0]); v != "" {
+			add(filepath.Join(v, "crush"), inHome(v))
+		} else if home != "" {
+			add(filepath.Join(home, e[1], "crush"), true)
+		}
+	}
+	add("/etc/crush", false)
+	return out
+}
+
 func BwrapArgs(crushBin string, crushArgs []string, bot roster.Bot, root string) []string {
 	home := roster.Home(root, bot.Slug)
 	absCrush, _ := exec.LookPath(crushBin)
@@ -108,6 +146,8 @@ func BwrapArgs(crushBin string, crushArgs []string, bot roster.Bot, root string)
 		"--ro-bind", "/lib", "/lib",
 		"--ro-bind-try", "/lib64", "/lib64",
 		"--ro-bind-try", "/etc/ssl", "/etc/ssl",
+		"--ro-bind-try", "/etc/ca-certificates", "/etc/ca-certificates",
+		"--ro-bind-try", "/etc/pki", "/etc/pki",
 		"--ro-bind-try", "/etc/resolv.conf", "/etc/resolv.conf",
 	}
 	for _, p := range crushRuntimePaths(absCrush) {
@@ -115,9 +155,6 @@ func BwrapArgs(crushBin string, crushArgs []string, bot roster.Bot, root string)
 	}
 	if self != "" {
 		out = append(out, "--ro-bind-try", self, self)
-	}
-	for _, p := range crushHostPaths() {
-		out = append(out, "--ro-bind-try", p, p)
 	}
 	out = append(out,
 		"--ro-bind", root, root,
@@ -127,6 +164,9 @@ func BwrapArgs(crushBin string, crushArgs []string, bot roster.Bot, root string)
 		"--setenv", "HOME", sandboxHome,
 		"--chdir", home,
 	)
+	for _, pair := range crushHostDirPairs(sandboxHome) {
+		out = append(out, "--ro-bind-try", pair[0], pair[1])
+	}
 	bots, _ := roster.List(root, true)
 	for _, b := range bots {
 		if b.Slug == bot.Slug {
@@ -169,6 +209,7 @@ func xdgCacheHome() string {
 }
 
 // crushHostPaths are Crush's global config/data/cache dirs (not $HOME).
+// Landlock uses this: it never remaps HOME, so the host paths stay valid.
 func crushHostPaths() []string {
 	home, _ := os.UserHomeDir()
 	seen := map[string]struct{}{}

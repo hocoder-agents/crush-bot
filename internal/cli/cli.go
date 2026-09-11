@@ -50,6 +50,10 @@ func run(io IO, args []string) int {
 		return cmdMesh(io, rest)
 	case "spawn":
 		return cmdSpawn(io, rest)
+	case "presets":
+		return cmdPresets(io, rest)
+	case "crew":
+		return cmdCrew(io, rest)
 	case "list":
 		return cmdList(io, rest)
 	case "show":
@@ -155,6 +159,7 @@ func cmdInit(io IO, _ []string) int {
 	fmt.Fprintln(io.Out, okStyle.Render("initialized"))
 	fmt.Fprintln(io.Out, "  home   ", p.Home)
 	fmt.Fprintln(io.Out, "  config ", p.ConfigFile)
+	fmt.Fprintln(io.Out, mutedStyle.Render("default crew: crushbot crew (crushbot presets to list)"))
 	return 0
 }
 
@@ -172,6 +177,8 @@ func printHelp(w io.Writer) {
 	}
 	row("init", "create CRUSHBOT_HOME and config")
 	row("spawn", "create a bot (required soul.md)")
+	row("presets", "list shipped default bots")
+	row("crew", "spawn every missing default bot")
 	row("list", "roster table; --json --all")
 	row("show", "inspect one bot")
 	row("soul", "print or --edit soul.md")

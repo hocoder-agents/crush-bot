@@ -9,6 +9,7 @@ import (
 
 	"github.com/hocoder-agents/crush-bot/internal/config"
 	"github.com/hocoder-agents/crush-bot/internal/crush"
+	"github.com/hocoder-agents/crush-bot/internal/preset"
 	"github.com/hocoder-agents/crush-bot/internal/protocol"
 	"github.com/hocoder-agents/crush-bot/internal/roster"
 	"github.com/hocoder-agents/crush-bot/internal/sandbox"
@@ -22,8 +23,12 @@ type Opts struct {
 	Project     string
 	CloneFrom   string
 	Coder       bool
-	Sandbox     string
-	KeepAlive   bool
+	// Tools overrides the {Bash, Edit} pair when set; nil means both follow Coder.
+	Tools     *roster.Tools
+	Sandbox   string
+	KeepAlive bool
+	// Soul seeds soul.md when set; empty means the generic seed.
+	Soul string
 }
 
 type Result struct {
@@ -45,7 +50,34 @@ func Create(root string, cfg config.Config, o Opts) (Result, error) {
 	if err := crush.HasProviders(bin); err != nil {
 		return out, err
 	}
-	if o.Coder && o.Sandbox != "off" {
+	tools := roster.Tools{Bash: o.Coder, Edit: o.Coder}
+	if o.CloneFrom == "" {
+		if entry, soulBody, ok := preset.Get(o.Slug); ok {
+			if o.Soul == "" {
+				o.Soul = soulBody
+			}
+			if o.Title == "" {
+				o.Title = entry.Title
+			}
+			if o.Description == "" {
+				o.Description = entry.Description
+			}
+			if !o.Coder {
+				o.Coder = entry.Coder
+			}
+			if o.Tools == nil {
+				if entry.Coder {
+					o.Tools = &roster.Tools{Bash: true, Edit: true}
+				} else if entry.Bash || entry.Edit {
+					o.Tools = &roster.Tools{Bash: entry.Bash, Edit: entry.Edit}
+				}
+			}
+		}
+	}
+	if o.Tools != nil {
+		tools = *o.Tools
+	}
+	if (tools.Bash || tools.Edit) && o.Sandbox != "off" {
 		if err := sandbox.Available(); err != nil {
 			return out, fmt.Errorf("%w (or pass --sandbox-off)", err)
 		}
@@ -58,10 +90,12 @@ func Create(root string, cfg config.Config, o Opts) (Result, error) {
 		Project:     o.Project,
 		CloneFrom:   o.CloneFrom,
 		Coder:       o.Coder,
+		Tools:       o.Tools,
 		Sandbox:     o.Sandbox,
 		KeepAlive:   o.KeepAlive,
 		MaxBots:     cfg.MaxBots,
 		SoulMax:     cfg.SoulMaxBytes,
+		SoulBody:    o.Soul,
 	})
 	if err != nil {
 		return out, err

@@ -11,6 +11,7 @@ import (
 
 	"github.com/hocoder-agents/crush-bot/internal/config"
 	"github.com/hocoder-agents/crush-bot/internal/crush"
+	"github.com/hocoder-agents/crush-bot/internal/preset"
 	"github.com/hocoder-agents/crush-bot/internal/roster"
 	"github.com/hocoder-agents/crush-bot/internal/soul"
 	"github.com/hocoder-agents/crush-bot/internal/spawn"
@@ -49,6 +50,25 @@ func cmdSpawn(io IO, args []string) int {
 			return 2
 		}
 	}
+	presetSoul := ""
+	var presetTools *roster.Tools
+	if *cloneFrom == "" && slug != "" {
+		if entry, soulBody, ok := preset.Get(spawn.NormalizeSlug(slug)); ok {
+			if *title == "" {
+				*title = entry.Title
+			}
+			if *desc == "" {
+				*desc = entry.Description
+			}
+			if !*coder {
+				*coder = entry.Coder
+				if entry.Coder || entry.Bash || entry.Edit {
+					presetTools = &roster.Tools{Bash: entry.Coder || entry.Bash, Edit: entry.Coder || entry.Edit}
+				}
+			}
+			presetSoul = soulBody
+		}
+	}
 	if slug == "" || (*title == "" && *desc == "" && !*coder && interactive()) {
 		s, t, d, c := slug, *title, *desc, *coder
 		if err := spawn.Form(&s, &t, &d, &c); err != nil {
@@ -83,6 +103,8 @@ func cmdSpawn(io IO, args []string) int {
 		Coder:       *coder,
 		Sandbox:     sandboxMode,
 		KeepAlive:   *keepAlive,
+		Soul:        presetSoul,
+		Tools:       presetTools,
 	})
 	if err != nil {
 		return fail(io, err)
