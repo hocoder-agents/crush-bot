@@ -174,7 +174,8 @@ func ReadTranscript(home, id string) ([]Line, error) {
 func Mentions(body string, members []string) []string {
 	var hit []string
 	for _, m := range members {
-		if strings.Contains(body, "@"+m) {
+		// Tolerate "@ sophie" (space after the @); it clearly names the bot.
+		if strings.Contains(body, "@"+m) || strings.Contains(body, "@"+" "+m) {
 			hit = append(hit, m)
 		}
 	}

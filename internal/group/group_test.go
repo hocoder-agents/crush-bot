@@ -47,3 +47,16 @@ func TestCreateBounds(t *testing.T) {
 		t.Fatal("need 2 members")
 	}
 }
+
+func TestMentionsToleratesSpaceAfterAt(t *testing.T) {
+	members := []string{"diana", "sophie"}
+	if got := Mentions("@ sophie what do you think?", members); len(got) != 1 || got[0] != "sophie" {
+		t.Fatalf("space mention missed: %v", got)
+	}
+	if got := Mentions("hey @sophie", members); len(got) != 1 || got[0] != "sophie" {
+		t.Fatalf("tight mention missed: %v", got)
+	}
+	if got := Mentions("no mentions here", members); got != nil {
+		t.Fatalf("false positive: %v", got)
+	}
+}

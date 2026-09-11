@@ -64,7 +64,10 @@ func Round(ctx context.Context, cfg config.Config, bin, root string, g Group, ro
 			return false, err
 		}
 		home := roster.Home(root, slug)
-		l, err := lock.Acquire(crush.LockPath(home), 0, true)
+		// Wait for the lock instead of instant-skipping: daemon DM wakes and
+		// group rounds legitimately contend, and a skipped member looks like
+		// the room ignoring them. The timeout bounds the wait.
+		l, err := lock.Acquire(crush.LockPath(home), cfg.TurnLockTimeout, false)
 		if err != nil {
 			_ = AppendLine(root, g.ID, Line{Round: round, From: slug, Kind: "pass", Body: "skipped: target_busy", Pass: true})
 			continue
