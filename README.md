@@ -124,7 +124,9 @@ Public lines are `group_say`. `message_bot` in a group round is a private DM.
 crushbot                  # or: crushbot mesh
 ```
 
-Roster on the left; the right pane is that bot’s Crush **session transcript** plus a prompt (`crush run`, same as `say`). `enter` opens chat, type a line and `enter` to send, `pgup`/`pgdn` scroll, `i` opens the mailbox, `ctrl+g` returns to the list, `n` spawns a bot, `q` / `ctrl+q` quits. Full Crush TUI is still `crushbot chat <slug>`. `--plain` prints a table.
+Roster on the left (an `agents` section, then `groups`); the right pane is that bot’s Crush **session transcript** plus a prompt (`crush run`, same as `say`). Bots hold a lavender braille spinner while a turn is in flight, and the open room spins pink while a settle round runs.
+
+Keys: `enter` opens chat (or the selected room), type a line and `enter` to send, `pgup`/`pgdn` scroll, `i` opens the mailbox, `ctrl+g` returns to the list, `n` spawns a bot (modal form), `g` creates a group (room id + member picker), `:` or `?` opens the quicklaunch panel (type-to-filter commands, including disband room and `doctor --check`), `r` refreshes, `q` / `ctrl+q` quits. Full Crush TUI is still `crushbot chat <slug>`. `--plain` prints a table.
 
 ### Keep-alive Crush server
 
