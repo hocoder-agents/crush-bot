@@ -39,8 +39,7 @@ New inits have `experimental.tasks: true`. Completing a task notifies the assign
 Off until you opt in:
 
 ```bash
-crushbot group enable
-crushbot group create review researcher coder
+crushbot group create review natasha diana andreea
 crushbot group chat review --plain
 ```
 

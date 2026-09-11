@@ -10,14 +10,12 @@ import (
 
 	"github.com/hocoder-agents/crush-bot/internal/config"
 	"github.com/hocoder-agents/crush-bot/internal/group"
-	"github.com/hocoder-agents/crush-bot/internal/protocol"
-	"github.com/hocoder-agents/crush-bot/internal/roster"
 	"github.com/hocoder-agents/crush-bot/internal/ui"
 )
 
 func cmdGroup(io IO, args []string) int {
 	if len(args) == 0 {
-		fmt.Fprintln(io.Err, errStyle.Render("usage: crushbot group enable|create|list|chat|disband"))
+		fmt.Fprintln(io.Err, errStyle.Render("usage: crushbot group create|list|chat|disband"))
 		return 2
 	}
 	p := config.ResolvePaths()
@@ -26,24 +24,7 @@ func cmdGroup(io IO, args []string) int {
 		return fail(io, err)
 	}
 	switch args[0] {
-	case "enable":
-		cfg.Experimental.Groups = true
-		if err := config.Save(p, cfg); err != nil {
-			return fail(io, err)
-		}
-		_ = config.EnsureHome(p)
-		_ = config.Save(config.Paths{ConfigDir: p.Home, ConfigFile: p.Home + "/config.yaml"}, cfg)
-		bots, _ := roster.List(p.Home, true)
-		for _, b := range bots {
-			_ = protocol.Write(protocol.Options{Root: p.Home, Bot: b, Teammates: bots, Tasks: cfg.Experimental.Tasks, Groups: true, IncludeMCP: true, CrushbotPath: "crushbot"})
-		}
-		fmt.Fprintln(io.Out, okStyle.Render("experimental.groups enabled"))
-		return 0
 	case "create":
-		if !cfg.Experimental.Groups {
-			fmt.Fprintln(io.Err, errStyle.Render("enable experimental.groups first: crushbot group enable"))
-			return 1
-		}
 		if len(args) < 4 {
 			fmt.Fprintln(io.Err, errStyle.Render("usage: crushbot group create <name> <member> <member> [members...]"))
 			return 2
@@ -55,10 +36,6 @@ func cmdGroup(io IO, args []string) int {
 		fmt.Fprintln(io.Out, okStyle.Render("created group "+g.ID+" members "+strings.Join(g.Members, ",")))
 		return 0
 	case "list":
-		if !cfg.Experimental.Groups {
-			fmt.Fprintln(io.Err, errStyle.Render("enable experimental.groups first: crushbot group enable"))
-			return 1
-		}
 		gs, err := group.List(p.Home)
 		if err != nil {
 			return fail(io, err)
@@ -97,10 +74,6 @@ func cmdGroup(io IO, args []string) int {
 			fmt.Fprintln(io.Err, errStyle.Render("usage: crushbot group chat <id> [--plain]"))
 			return 2
 		}
-		if !cfg.Experimental.Groups {
-			fmt.Fprintln(io.Err, errStyle.Render("enable experimental.groups first: crushbot group enable"))
-			return 1
-		}
 		g, err := group.Load(p.Home, id)
 		if err != nil {
 			return fail(io, err)
@@ -138,7 +111,7 @@ func cmdGroup(io IO, args []string) int {
 		}
 		return 0
 	default:
-		fmt.Fprintln(io.Err, errStyle.Render("usage: crushbot group enable|create|list|chat|disband"))
+		fmt.Fprintln(io.Err, errStyle.Render("usage: crushbot group create|list|chat|disband"))
 		return 2
 	}
 }

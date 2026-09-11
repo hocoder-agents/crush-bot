@@ -8,6 +8,9 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+
+	"github.com/hocoder-agents/crush-bot/internal/version"
 )
 
 type action struct {
@@ -71,9 +74,16 @@ func (m *Model) paletteClamp() {
 
 func (m Model) paletteView(width, height int) string {
 	acts := m.paletteFiltered()
+	inner := width - 8 // border + padding margins
+	if inner < 12 {
+		inner = 12
+	}
+	if inner > 44 {
+		inner = 44
+	}
 	var b strings.Builder
-	fmt.Fprintln(&b, nameStyle.Render("quicklaunch"))
-	fmt.Fprintln(&b, mutedStyle.Render("/"+m.paletteQuery+"   (type to filter · enter run · esc close)"))
+	fmt.Fprintln(&b, gradientText("quicklaunch")+"  "+mutedStyle.Render(version.Version))
+	fmt.Fprintln(&b, mutedStyle.Render("/"+m.paletteQuery))
 	fmt.Fprintln(&b)
 	if len(acts) == 0 {
 		fmt.Fprintln(&b, mutedStyle.Render("no matching action"))
@@ -88,12 +98,24 @@ func (m Model) paletteView(width, height int) string {
 			line += "  " + keyStyle.Render(a.hint)
 		}
 		if i == m.paletteIdx {
-			line = selStyle.Width(width - 2).Render(line)
+			line = selStyle.Width(inner).Render(line)
 		}
 		fmt.Fprintln(&b, line)
 	}
-	return padStyle(width).MaxHeight(height).Render(b.String())
+	fmt.Fprintln(&b)
+	fmt.Fprintln(&b, mutedStyle.Render("type to filter · enter run · esc close"))
+	box := modalStyle.Render(b.String())
+	return lipgloss.Place(width, height,
+		lipgloss.Center, lipgloss.Center, box,
+		lipgloss.WithWhitespaceStyle(lipgloss.NewStyle().Background(lipgloss.Color("#191622"))),
+	)
 }
+
+// modalStyle frames the quicklaunch as a floating panel.
+var modalStyle = lipgloss.NewStyle().
+	Border(lipgloss.RoundedBorder()).
+	BorderForeground(lavender).
+	Padding(1, 3)
 
 type doctorDoneMsg struct{ err error }
 

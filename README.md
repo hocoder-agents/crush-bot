@@ -109,8 +109,7 @@ Bots assign work with the `assign_task` MCP tool. New inits have `experimental.t
 ### Groups
 
 ```bash
-crushbot group enable
-crushbot group create review researcher coder
+crushbot group create review natasha diana andreea
 crushbot group list
 crushbot group chat review              # Bubble Tea transcript + input
 crushbot group chat review --plain      # scripts / pipes
