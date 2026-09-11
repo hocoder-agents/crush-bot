@@ -314,6 +314,21 @@ func Spawn(root string, opts SpawnOpts) (Bot, []string, error) {
 	return bot, warns, nil
 }
 
+// SetProject points a bot's advisory project at an absolute directory
+// (or clears it with ""). The caller regenerates protocol files so the
+// change reaches the bot's context.
+func SetProject(root, slug, project string) (Bot, error) {
+	bot, err := Load(root, slug)
+	if err != nil {
+		return Bot{}, err
+	}
+	if project != "" && !filepath.IsAbs(project) {
+		return Bot{}, fmt.Errorf("project must be an absolute path")
+	}
+	bot.Project = project
+	return bot, Save(root, bot)
+}
+
 func SetHidden(root, slug string, hidden bool) (Bot, error) {
 	bot, err := Load(root, slug)
 	if err != nil {
