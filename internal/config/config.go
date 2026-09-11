@@ -24,6 +24,7 @@ type Config struct {
 	MaxBots         int           `yaml:"max_bots"`
 	SoulMaxBytes    int           `yaml:"soul_max_bytes"`
 	MessageMaxChars int           `yaml:"message_max_chars"`
+	ProjectRoots    []string      `yaml:"project_roots"`
 	CoalesceInbox   int           `yaml:"coalesce_inbox"`
 	ClaimTTLS       int           `yaml:"claim_ttl_s"`
 	QueuedExpire    time.Duration `yaml:"queued_expire"`
@@ -50,6 +51,7 @@ func Default() Config {
 		Experimental: Experimental{
 			Tasks: true,
 		},
+		ProjectRoots: []string{"~/repos"},
 	}
 }
 
@@ -95,6 +97,9 @@ func (c *Config) applyDefaults() {
 	}
 	if c.MessageMaxChars <= 0 {
 		c.MessageMaxChars = d.MessageMaxChars
+	}
+	if len(c.ProjectRoots) == 0 {
+		c.ProjectRoots = d.ProjectRoots
 	}
 	if c.CoalesceInbox <= 0 {
 		c.CoalesceInbox = d.CoalesceInbox

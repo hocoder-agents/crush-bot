@@ -2,6 +2,7 @@ package ui
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -322,5 +323,66 @@ func TestRoomTranscriptRendering(t *testing.T) {
 	}
 	if !strings.Contains(out, "38;5;205m") {
 		t.Fatalf("no ANSI color in speaker names: %s", out)
+	}
+}
+
+func TestGitProjectsDiscovery(t *testing.T) {
+	home := t.TempDir()
+	mk := func(rel string, git bool) {
+		dir := filepath.Join(home, rel)
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if git {
+			if err := os.MkdirAll(filepath.Join(dir, ".git"), 0o700); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	mk("repos/wrapmind/wrapmind", true)        // repo
+	mk("repos/hocoder-agents/crush-bot", true) // repo
+	mk("repos/wrapmind/notarepo", false)       // plain dir
+	got := gitProjects([]string{home + "/repos"})
+	if len(got) != 2 {
+		t.Fatalf("want 2 repos, got %v", got)
+	}
+	joined := strings.Join(got, ",")
+	if !strings.Contains(joined, filepath.Join("wrapmind", "wrapmind")) {
+		t.Fatalf("missing wrapmind: %v", got)
+	}
+	if !strings.Contains(joined, "crush-bot") {
+		t.Fatalf("missing nested repo: %v", got)
+	}
+}
+
+func TestApplyProjectUpdatesCrew(t *testing.T) {
+	home := t.TempDir()
+	for _, s := range []string{"diana", "natasha"} {
+		if err := roster.Save(home, roster.Bot{Slug: s, Title: strings.ToUpper(s[:1]) + s[1:]}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	m := Model{home: home}
+	m.reload()
+	dir := filepath.Join(home, "repos", "wrapmind", "wrapmind")
+	if err := os.MkdirAll(filepath.Join(dir, ".git"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	mi, _ := m.applyProject(dir)
+	m = mi.(Model)
+	for _, r := range m.rows {
+		if r.bot.Project != dir {
+			t.Fatalf("@%s project = %q", r.bot.Slug, r.bot.Project)
+		}
+	}
+	bot, err := roster.Load(home, "diana")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bot.Project != dir {
+		t.Fatalf("bot.yaml not updated: %+v", bot)
+	}
+	if _, err := os.Stat(filepath.Join(roster.Home(home, "diana"), "protocol.md")); err != nil {
+		t.Fatalf("protocol not regenerated: %v", err)
 	}
 }

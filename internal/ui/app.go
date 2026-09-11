@@ -74,6 +74,7 @@ type Model struct {
 	disbandPending string
 	spawnForm      spawnFormState
 	groupForm      groupFormState
+	projectForm    projectFormState
 	spinnerBot     spinner.Model
 	spinnerGroup   spinner.Model
 }
@@ -273,7 +274,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.spawnForm.active {
 				return m.updateSpawnForm(msg)
 			}
-			return m.updateGroupForm(msg)
+			if m.groupForm.active {
+				return m.updateGroupForm(msg)
+			}
+			return m.updateProjectForm(msg)
 		}
 		if m.paletteOpen {
 			return m.updatePalette(msg)
@@ -404,6 +408,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.openSpawnForm()
 		case "g":
 			return m.openGroupForm()
+		case "p":
+			return m.openProjectForm()
 		case "enter":
 			return m.openSelected()
 		}
@@ -663,6 +669,9 @@ func (m Model) sidebarView(width, height int) string {
 }
 
 func (m Model) rightView(width, height int) string {
+	if m.projectForm.active {
+		return m.projectView(width, height)
+	}
 	if m.formActive() {
 		return m.formView(width, height)
 	}
@@ -720,10 +729,14 @@ func (m Model) helpView(width int) string {
 			keyStyle.Render("j/k"), keyStyle.Render("tab"), keyStyle.Render("enter"),
 			keyStyle.Render("R"), keyStyle.Render("esc"), keyStyle.Render("q"))
 	default:
-		s = fmt.Sprintf("%s move  %s chat  %s inbox  %s bot  %s group  %s refresh  %s quicklaunch  %s quit",
+		proj := ""
+		if p := m.currentProject(); p != "" {
+			proj = userStyle().Render("*" + projectDisplay(p))
+		}
+		s = fmt.Sprintf("%s move  %s chat  %s inbox  %s bot  %s group  %s project %s  %s refresh  %s quicklaunch  %s quit",
 			keyStyle.Render("j/k"), keyStyle.Render("enter"), keyStyle.Render("i"),
-			keyStyle.Render("n"), keyStyle.Render("g"), keyStyle.Render("r"),
-			keyStyle.Render(":"), keyStyle.Render("q"))
+			keyStyle.Render("n"), keyStyle.Render("g"), keyStyle.Render("p"), proj,
+			keyStyle.Render("r"), keyStyle.Render(":"), keyStyle.Render("q"))
 	}
 	return helpStyle.Width(width).MaxWidth(width).Render(s)
 }
