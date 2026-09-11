@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+
+	"github.com/hocoder-agents/crush-bot/internal/version"
 )
 
 type rpcReq struct {
@@ -62,7 +64,7 @@ func handle(req rpcReq, id Identity) rpcRes {
 		return ok(map[string]any{
 			"protocolVersion": "2024-11-05",
 			"capabilities":    map[string]any{"tools": map[string]any{}},
-			"serverInfo":      map[string]any{"name": "crushbot-mesh", "version": "0.0.1-dev"},
+			"serverInfo":      map[string]any{"name": "crushbot-mesh", "version": version.Version},
 		})
 	case "ping":
 		return ok(map[string]any{})
