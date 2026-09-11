@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -150,5 +151,46 @@ func TestPaletteKeyDownThenRun(t *testing.T) {
 	m3 := m3i.(Model)
 	if m3.paletteOpen {
 		t.Fatal("palette should be closed after run")
+	}
+}
+
+func TestParseMembers(t *testing.T) {
+	slugs := []string{"natasha", "diana", "andreea", "masha"}
+	got, err := parseMembers("1 3", slugs)
+	if err != nil || len(got) != 2 || got[0] != "natasha" || got[1] != "andreea" {
+		t.Fatalf("numbers: %v %v", got, err)
+	}
+	got, err = parseMembers("diana, @masha", slugs)
+	if err != nil || len(got) != 2 || got[0] != "diana" || got[1] != "masha" {
+		t.Fatalf("names: %v %v", got, err)
+	}
+	if _, err := parseMembers("1", slugs); err == nil {
+		t.Fatal("one member should fail")
+	}
+	if _, err := parseMembers("9", slugs); err == nil {
+		t.Fatal("out of range should fail")
+	}
+}
+
+func TestDisbandUnderCursor(t *testing.T) {
+	home := t.TempDir()
+	for _, s := range []string{"diana", "natasha"} {
+		if err := roster.Save(home, roster.Bot{Slug: s}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := group.Create(home, "review", []string{"diana", "natasha"}); err != nil {
+		t.Fatal(err)
+	}
+	m := Model{home: home}
+	m.reload()
+	m.cursor = len(m.rows) // first room
+	m2i, _ := m.disbandUnderCursor()
+	m2 := m2i.(Model)
+	if _, err := os.Stat(group.Dir(home, "review")); !os.IsNotExist(err) {
+		t.Fatalf("room still exists: %v", err)
+	}
+	if !strings.Contains(m2.status, "disbanded") {
+		t.Fatalf("status %q", m2.status)
 	}
 }

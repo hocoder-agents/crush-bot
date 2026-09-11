@@ -53,24 +53,25 @@ type row struct {
 }
 
 type Model struct {
-	width, height int
-	home          string
-	rows          []row
-	cursor        int
-	status        string
-	focus         int
-	chatSlug      string
-	chatBusy      bool
-	in            textinput.Model
-	vp            viewport.Model
-	showInbox     bool
-	inbox         inboxState
-	groups        []group.Group
-	chatGroup     string
-	groupBusy     bool
-	paletteOpen   bool
-	paletteQuery  string
-	paletteIdx    int
+	width, height  int
+	home           string
+	rows           []row
+	cursor         int
+	status         string
+	focus          int
+	chatSlug       string
+	chatBusy       bool
+	in             textinput.Model
+	vp             viewport.Model
+	showInbox      bool
+	inbox          inboxState
+	groups         []group.Group
+	chatGroup      string
+	groupBusy      bool
+	paletteOpen    bool
+	paletteQuery   string
+	paletteIdx     int
+	disbandPending string
 }
 
 func New(home string) Model {
@@ -189,6 +190,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.chatGroup != "" {
 			m.reloadGroupChat()
 		}
+	case groupCreatedMsg:
+		m.reload()
+		if msg.err != nil {
+			if msg.err == spawn.ErrAborted || msg.err.Error() == "cancelled" {
+				m.status = "cancelled"
+			} else {
+				m.status = "group create failed: " + msg.err.Error()
+			}
+			return m, nil
+		}
+		for i, g := range m.groups {
+			if g.ID == msg.id {
+				m.cursor = len(m.rows) + i
+				break
+			}
+		}
+		m.status = "created @" + msg.id
 	case groupDoneMsg:
 		m.chatBusy = false
 		m.groupBusy = false
@@ -320,6 +338,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.focus == focusInbox {
 				m.inbox.move(1)
 			} else if m.flatTotal() > 0 {
+				m.disbandPending = ""
 				m.cursor = (m.cursor + 1) % m.flatTotal()
 				if m.showInbox {
 					m.reloadInbox()
@@ -329,6 +348,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.focus == focusInbox {
 				m.inbox.move(-1)
 			} else if m.flatTotal() > 0 {
+				m.disbandPending = ""
 				m.cursor = (m.cursor - 1 + m.flatTotal()) % m.flatTotal()
 				if m.showInbox {
 					m.reloadInbox()
@@ -351,7 +371,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				}
 			}
+		case "D":
+			if m.disbandPending != "" {
+				m2, cmd := m.disbandUnderCursor()
+				mm := m2.(Model)
+				mm.disbandPending = ""
+				return mm, cmd
+			}
 		case "r":
+			m.disbandPending = ""
 			m.reload()
 			if m.chatSlug != "" {
 				m.reloadChat()
