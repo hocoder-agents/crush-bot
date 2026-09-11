@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hocoder-agents/crush-bot/internal/config"
 	"github.com/hocoder-agents/crush-bot/internal/roster"
 )
 
@@ -40,7 +39,8 @@ func Dir(home, id string) string {
 	return filepath.Join(Root(home), id)
 }
 
-func Enabled(cfg config.Config) bool { return cfg.Experimental.Groups }
+// Enabled: groups are baked in; no experimental gate anymore.
+func Enabled() bool { return true }
 
 func Load(home, id string) (Group, error) {
 	b, err := os.ReadFile(filepath.Join(Dir(home, id), "group.yaml"))

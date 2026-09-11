@@ -8,25 +8,13 @@ import (
 	"syscall"
 	"unicode/utf8"
 
-	"github.com/hocoder-agents/crush-bot/internal/config"
 	"github.com/hocoder-agents/crush-bot/internal/crush"
 	"github.com/hocoder-agents/crush-bot/internal/group"
 )
 
-func groupsEnabled(id Identity) bool {
-	cfg, err := config.Load(config.Paths{ConfigFile: id.Root + "/config.yaml"})
-	if err != nil {
-		return false
-	}
-	return cfg.Experimental.Groups
-}
-
 func GroupSay(id Identity, body string) CallResult {
 	if err := id.Validate(); err != nil {
 		return failReason(err)
-	}
-	if !groupsEnabled(id) {
-		return CallResult{Reason: "missing_config", Error: "experimental.groups is false"}
 	}
 	if utf8.RuneCountInString(body) > MessageMaxChars {
 		return CallResult{Reason: "message_too_long", Error: "line too long"}
@@ -61,9 +49,6 @@ func GroupSay(id Identity, body string) CallResult {
 func GroupPass(id Identity) CallResult {
 	if err := id.Validate(); err != nil {
 		return failReason(err)
-	}
-	if !groupsEnabled(id) {
-		return CallResult{Reason: "missing_config", Error: "experimental.groups is false"}
 	}
 	turn, err := crush.ReadTurn(id.BotHome())
 	if err != nil || turn.Kind != "group_round" {

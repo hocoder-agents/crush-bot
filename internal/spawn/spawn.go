@@ -109,7 +109,7 @@ func Create(root string, cfg config.Config, o Opts) (Result, error) {
 		Bot:          bot,
 		Teammates:    all,
 		Tasks:        cfg.Experimental.Tasks,
-		Groups:       cfg.Experimental.Groups,
+		Groups:       true,
 		IncludeMCP:   true,
 		CrushbotPath: exe,
 		SoulMax:      cfg.SoulMaxBytes,

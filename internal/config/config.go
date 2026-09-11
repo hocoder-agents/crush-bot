@@ -31,8 +31,7 @@ type Config struct {
 }
 
 type Experimental struct {
-	Groups bool `yaml:"groups"`
-	Tasks  bool `yaml:"tasks"`
+	Tasks bool `yaml:"tasks"`
 }
 
 func Default() Config {
@@ -49,8 +48,7 @@ func Default() Config {
 		ClaimTTLS:       900,
 		QueuedExpire:    24 * time.Hour,
 		Experimental: Experimental{
-			Groups: false,
-			Tasks:  true,
+			Tasks: true,
 		},
 	}
 }

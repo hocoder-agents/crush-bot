@@ -29,7 +29,7 @@ func writeProtocol(p config.Paths, cfg config.Config, bot roster.Bot) error {
 		Bot:          bot,
 		Teammates:    all,
 		Tasks:        cfg.Experimental.Tasks,
-		Groups:       cfg.Experimental.Groups,
+		Groups:       true,
 		IncludeMCP:   true,
 		CrushbotPath: exe,
 		SoulMax:      cfg.SoulMaxBytes,
@@ -218,9 +218,6 @@ func cmdDoctor(io IO, args []string) int {
 	}
 	if !cfg.Experimental.Tasks {
 		fmt.Fprintln(io.Out, mutedStyle.Render("warn  experimental.tasks is false; task MCP tools are disabled"))
-	}
-	if !cfg.Experimental.Groups {
-		fmt.Fprintln(io.Out, mutedStyle.Render("warn  experimental.groups is false; crushbot group enable to turn on"))
 	}
 	if len(slugs) == 0 {
 		fmt.Fprintln(io.Out, mutedStyle.Render("no bots"))

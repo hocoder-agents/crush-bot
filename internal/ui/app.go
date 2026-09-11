@@ -109,11 +109,7 @@ func (m *Model) reload() {
 		}
 		m.rows = append(m.rows, row{bot: b, pending: len(envs), busy: busy})
 	}
-	if cfg, err := config.Load(config.ResolvePaths()); err == nil && group.Enabled(cfg) {
-		m.groups, _ = group.List(m.home)
-	} else {
-		m.groups = nil
-	}
+	m.groups, _ = group.List(m.home)
 	if m.cursor >= m.flatTotal() {
 		m.cursor = 0
 	}
