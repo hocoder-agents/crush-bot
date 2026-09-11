@@ -154,24 +154,6 @@ func TestPaletteKeyDownThenRun(t *testing.T) {
 	}
 }
 
-func TestParseMembers(t *testing.T) {
-	slugs := []string{"natasha", "diana", "andreea", "masha"}
-	got, err := parseMembers("1 3", slugs)
-	if err != nil || len(got) != 2 || got[0] != "natasha" || got[1] != "andreea" {
-		t.Fatalf("numbers: %v %v", got, err)
-	}
-	got, err = parseMembers("diana, @masha", slugs)
-	if err != nil || len(got) != 2 || got[0] != "diana" || got[1] != "masha" {
-		t.Fatalf("names: %v %v", got, err)
-	}
-	if _, err := parseMembers("1", slugs); err == nil {
-		t.Fatal("one member should fail")
-	}
-	if _, err := parseMembers("9", slugs); err == nil {
-		t.Fatal("out of range should fail")
-	}
-}
-
 func TestDisbandUnderCursor(t *testing.T) {
 	home := t.TempDir()
 	for _, s := range []string{"diana", "natasha"} {
@@ -192,5 +174,82 @@ func TestDisbandUnderCursor(t *testing.T) {
 	}
 	if !strings.Contains(m2.status, "disbanded") {
 		t.Fatalf("status %q", m2.status)
+	}
+}
+
+func TestSpawnFormValidation(t *testing.T) {
+	home := t.TempDir()
+	if err := roster.Save(home, roster.Bot{Slug: "diana", Title: "Coder"}); err != nil {
+		t.Fatal(err)
+	}
+	base := Model{home: home}
+	mi, _ := base.openSpawnForm()
+	m := mi.(Model)
+	if !m.spawnForm.active {
+		t.Fatal("form not active")
+	}
+	// bad slug
+	m.spawnForm.slug.SetValue("1bot")
+	m2i, _ := m.updateSpawnForm(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m2i, _ = m2i.(Model).updateSpawnForm(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m2i, _ = m2i.(Model).updateSpawnForm(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m2i, _ = m2i.(Model).updateSpawnForm(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m2 := m2i.(Model)
+	if m2.spawnForm.err == "" {
+		t.Fatal("invalid slug should set form error")
+	}
+	// existing slug
+	m3i, _ := m.openSpawnForm()
+	m3 := m3i.(Model)
+	m3.spawnForm.slug.SetValue("diana")
+	for i := 0; i < 4; i++ {
+		m3i, _ = m3.updateSpawnForm(tea.KeyPressMsg{Code: tea.KeyEnter})
+		m3 = m3i.(Model)
+	}
+	if m3.spawnForm.err == "" {
+		t.Fatal("duplicate slug should set form error")
+	}
+}
+
+func TestGroupFormTogglesAndGuard(t *testing.T) {
+	home := t.TempDir()
+	for _, s := range []string{"diana", "natasha"} {
+		if err := roster.Save(home, roster.Bot{Slug: s}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	base := Model{home: home}
+	mi, _ := base.openGroupForm()
+	m := mi.(Model)
+	m.groupForm.id.SetValue("review")
+	// advance to member picker
+	mi, _ = m.updateGroupForm(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = mi.(Model)
+	// submit with nothing chosen -> error, form stays
+	mi, _ = m.updateGroupForm(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = mi.(Model)
+	if m.groupForm.err == "" {
+		t.Fatal("empty roster pick should error")
+	}
+	if !m.groupForm.active {
+		t.Fatal("form should stay open on error")
+	}
+	// toggle first two bots, submit
+	mi, _ = m.updateGroupForm(tea.KeyPressMsg{Code: ' '})
+	m = mi.(Model)
+	mi, _ = m.updateGroupForm(tea.KeyPressMsg{Code: 'j'})
+	m = mi.(Model)
+	mi, _ = m.updateGroupForm(tea.KeyPressMsg{Code: ' '})
+	m = mi.(Model)
+	mi, _ = m.updateGroupForm(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = mi.(Model)
+	if m.groupForm.active {
+		t.Fatal("form should close after create")
+	}
+	if _, err := os.Stat(group.Dir(home, "review")); err != nil {
+		t.Fatalf("room not created: %v", err)
+	}
+	if m.rows[0].bot.Slug != "diana" {
+		t.Fatalf("cursor not on new room: %+v", m.rows)
 	}
 }

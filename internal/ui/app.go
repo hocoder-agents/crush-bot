@@ -3,7 +3,6 @@ package ui
 import (
 	"errors"
 	"fmt"
-	"io"
 	"sort"
 	"strings"
 
@@ -12,7 +11,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
-	"github.com/hocoder-agents/crush-bot/internal/config"
 	"github.com/hocoder-agents/crush-bot/internal/crush"
 	"github.com/hocoder-agents/crush-bot/internal/daemon"
 	"github.com/hocoder-agents/crush-bot/internal/envelope"
@@ -72,6 +70,8 @@ type Model struct {
 	paletteQuery   string
 	paletteIdx     int
 	disbandPending string
+	spawnForm      spawnFormState
+	groupForm      groupFormState
 }
 
 func New(home string) Model {
@@ -190,23 +190,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.chatGroup != "" {
 			m.reloadGroupChat()
 		}
-	case groupCreatedMsg:
-		m.reload()
-		if msg.err != nil {
-			if msg.err == spawn.ErrAborted || msg.err.Error() == "cancelled" {
-				m.status = "cancelled"
-			} else {
-				m.status = "group create failed: " + msg.err.Error()
-			}
-			return m, nil
-		}
-		for i, g := range m.groups {
-			if g.ID == msg.id {
-				m.cursor = len(m.rows) + i
-				break
-			}
-		}
-		m.status = "created @" + msg.id
 	case groupDoneMsg:
 		m.chatBusy = false
 		m.groupBusy = false
@@ -261,6 +244,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyPressMsg:
 		if isCtrl(msg, 'q') {
 			return m.quitHost()
+		}
+		if m.formActive() {
+			if m.spawnForm.active {
+				return m.updateSpawnForm(msg)
+			}
+			return m.updateGroupForm(msg)
 		}
 		if m.paletteOpen {
 			return m.updatePalette(msg)
@@ -388,10 +377,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.reloadGroupChat()
 			}
 		case "n":
-			wiz := &spawnWizard{home: m.home}
-			return m, tea.Exec(wiz, func(err error) tea.Msg {
-				return spawnDoneMsg{err: err, slug: wiz.slug}
-			})
+			return m.openSpawnForm()
 		case "enter":
 			return m.openSelected()
 		}
@@ -647,6 +633,9 @@ func (m Model) sidebarView(width, height int) string {
 }
 
 func (m Model) rightView(width, height int) string {
+	if m.formActive() {
+		return m.formView(width, height)
+	}
 	if m.paletteOpen {
 		return m.paletteView(width, height)
 	}
@@ -708,40 +697,6 @@ func (m Model) helpView(width int) string {
 	}
 	return helpStyle.Width(width).MaxWidth(width).Render(s)
 }
-
-type spawnWizard struct {
-	home string
-	slug string
-	in   io.Reader
-	out  io.Writer
-	err  io.Writer
-}
-
-func (w *spawnWizard) Run() error {
-	p := config.ResolvePaths()
-	cfg, err := config.Load(p)
-	if err != nil {
-		return err
-	}
-	if err := config.EnsureHome(p); err != nil {
-		return err
-	}
-	tty, err := spawn.OpenTTY()
-	if err != nil {
-		return fmt.Errorf("spawn form needs a terminal: %w", err)
-	}
-	defer tty.Close()
-	res, err := spawn.FromFormAccessible(w.home, cfg, tty, tty)
-	if err != nil {
-		return err
-	}
-	w.slug = res.Bot.Slug
-	return nil
-}
-
-func (w *spawnWizard) SetStdin(r io.Reader)  { w.in = r }
-func (w *spawnWizard) SetStdout(o io.Writer) { w.out = o }
-func (w *spawnWizard) SetStderr(e io.Writer) { w.err = e }
 
 func Run(home string) error {
 	p := tea.NewProgram(New(home), tea.WithFilter(func(_ tea.Model, msg tea.Msg) tea.Msg {

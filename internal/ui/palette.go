@@ -25,10 +25,10 @@ func (m Model) paletteActions() []action {
 		{label: "open bot transcript", hint: "enter", run: func(m Model) (tea.Model, tea.Cmd) { return m.openSelected() }},
 		{label: "open mailbox", hint: "i", run: func(m Model) (tea.Model, tea.Cmd) { return m.openInbox() }},
 		{label: "spawn a bot", hint: "n", run: func(m Model) (tea.Model, tea.Cmd) {
-			wiz := &spawnWizard{home: m.home}
-			return m, tea.Exec(wiz, func(err error) tea.Msg {
-				return spawnDoneMsg{err: err, slug: wiz.slug}
-			})
+			return m.openSpawnForm()
+		}},
+		{label: "create group", hint: "", run: func(m Model) (tea.Model, tea.Cmd) {
+			return m.openGroupForm()
 		}},
 		{label: "refresh roster", hint: "r", run: func(m Model) (tea.Model, tea.Cmd) {
 			m2 := m
@@ -41,12 +41,7 @@ func (m Model) paletteActions() []action {
 			}
 			return m2, nil
 		}},
-		{label: "create group", hint: "", run: func(m Model) (tea.Model, tea.Cmd) {
-			wiz := &groupWizard{home: m.home}
-			return m, tea.Exec(wiz, func(err error) tea.Msg {
-				return groupCreatedMsg{id: wiz.id, err: err}
-			})
-		}},
+
 		{label: "disband room under cursor", hint: "", run: func(m Model) (tea.Model, tea.Cmd) {
 			g, ok := m.selectedGroup()
 			if !ok {
