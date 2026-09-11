@@ -115,3 +115,22 @@ func osHome(t *testing.T) string {
 	}
 	return h
 }
+
+func TestCrushHostDirPairsRebaseIntoSandboxHome(t *testing.T) {
+	home := osHome(t)
+	root := t.TempDir()
+	bot := roster.Bot{Slug: "coder", Tools: roster.Tools{Bash: true}}
+	sandboxHome := filepath.Join(roster.Home(root, bot.Slug), "sandbox-home")
+	pairs := crushHostDirPairs(sandboxHome)
+	joined := ""
+	for _, p := range pairs {
+		joined += p[0] + " -> " + p[1] + "\n"
+	}
+	want := filepath.Join(home, ".local/share", "crush")
+	if !strings.Contains(joined, want+" -> "+filepath.Join(sandboxHome, ".local/share", "crush")) {
+		t.Fatalf("expected %s rebased under sandbox home, got:\n%s", want, joined)
+	}
+	if !strings.Contains(joined, "/etc/crush -> /etc/crush") {
+		t.Fatalf("missing /etc/crush pair:\n%s", joined)
+	}
+}
