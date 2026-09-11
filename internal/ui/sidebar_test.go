@@ -70,3 +70,25 @@ func TestSidebarOrchestratorFirst(t *testing.T) {
 		t.Fatalf("sophie not first: %+v", m.rows)
 	}
 }
+
+func TestDividerIsLavender(t *testing.T) {
+	m := Model{}
+	out := m.divider(5)
+	if !strings.Contains(out, "\x1b[38;2;196;181;253m") {
+		t.Fatalf("divider not lavender: %q", out)
+	}
+}
+
+func TestCrushViewPaddedFromDivider(t *testing.T) {
+	m := Model{rows: []row{{bot: roster.Bot{Slug: "diana", Title: "Coder"}}}, chatSlug: "diana"}
+	out := m.crushView(40, 10)
+	lines := strings.Split(out, "\n")
+	for _, l := range lines {
+		if l == "" {
+			continue
+		}
+		if !strings.HasPrefix(l, " ") {
+			t.Fatalf("transcript line not padded: %q", l)
+		}
+	}
+}

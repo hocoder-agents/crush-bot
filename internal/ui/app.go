@@ -39,7 +39,7 @@ var (
 	selStyle    = lipgloss.NewStyle().Background(lipgloss.Color("#3A3455"))
 	sideStyle   = lipgloss.NewStyle().Padding(0, 1)
 	helpStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Padding(0, 1)
-	divStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("238"))
+	divStyle    = lipgloss.NewStyle().Foreground(lavender)
 	divHotStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 	boxStyle    = lipgloss.NewStyle().Padding(1, 2)
 )
@@ -384,7 +384,7 @@ func (m *Model) sizeChat() {
 	if th < 3 {
 		th = 3
 	}
-	m.vp.SetWidth(w)
+	m.vp.SetWidth(w - 1)
 	m.vp.SetHeight(th)
 	m.in.SetWidth(max(8, w-2))
 }
@@ -533,6 +533,7 @@ func (m Model) rightView(width, height int) string {
 }
 
 func (m Model) crushView(width, height int) string {
+	pad := lipgloss.NewStyle().PaddingLeft(1).Width(width).MaxWidth(width)
 	if m.chatSlug == "" {
 		hint := mutedStyle.Render("press enter to open a bot transcript")
 		if len(m.rows) == 0 {
@@ -542,13 +543,13 @@ func (m Model) crushView(width, height int) string {
 		for len(lines) < height {
 			lines = append(lines, "")
 		}
-		return strings.Join(lines[:height], "\n")
+		return pad.Render(strings.Join(lines[:height], "\n"))
 	}
-	head := selStyle.Render("@"+m.chatSlug) + "  " + mutedStyle.Render("session")
+	head := nameStyle.Render("@"+m.chatSlug) + "  " + mutedStyle.Render("session")
 	if m.chatBusy {
 		head += "  " + mutedStyle.Render("running…")
 	}
-	return strings.Join([]string{head, m.vp.View(), m.in.View()}, "\n")
+	return pad.Render(strings.Join([]string{head, m.vp.View(), m.in.View()}, "\n"))
 }
 
 func (m Model) divider(height int) string {
