@@ -68,6 +68,9 @@ type Model struct {
 	groups        []group.Group
 	chatGroup     string
 	groupBusy     bool
+	paletteOpen   bool
+	paletteQuery  string
+	paletteIdx    int
 }
 
 func New(home string) Model {
@@ -244,6 +247,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyPressMsg:
 		if isCtrl(msg, 'q') {
 			return m.quitHost()
+		}
+		if m.paletteOpen {
+			return m.updatePalette(msg)
+		}
+		if msg.String() == ":" || msg.String() == "?" {
+			m.paletteOpen = true
+			m.paletteQuery = ""
+			m.paletteIdx = 0
+			m.status = "quicklaunch"
+			return m, nil
 		}
 		if isCtrl(msg, 'g') || isCtrl(msg, 'b') {
 			if m.focus == focusChat || m.focus == focusInbox {
@@ -610,6 +623,9 @@ func (m Model) sidebarView(width, height int) string {
 }
 
 func (m Model) rightView(width, height int) string {
+	if m.paletteOpen {
+		return m.paletteView(width, height)
+	}
 	if m.showInbox && m.inbox.slug != "" {
 		return renderInbox(m.inbox, width, height)
 	}
