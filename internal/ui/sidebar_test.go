@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 
+	tea "charm.land/bubbletea/v2"
+
 	"github.com/hocoder-agents/crush-bot/internal/group"
 	"github.com/hocoder-agents/crush-bot/internal/roster"
 )
@@ -106,5 +108,47 @@ func TestSidebarRoomsSection(t *testing.T) {
 	out := m.sidebarView(24, 20)
 	if !strings.Contains(out, "groups") || !strings.Contains(out, "@review") {
 		t.Fatalf("rooms missing from sidebar:\n%s", out)
+	}
+}
+
+func TestPaletteFilter(t *testing.T) {
+	m := Model{rows: []row{{bot: roster.Bot{Slug: "diana", Title: "Coder"}}}}
+	m.paletteQuery = "doc"
+	acts := m.paletteFiltered()
+	if len(acts) != 1 || acts[0].label != "doctor --check" {
+		t.Fatalf("filter 'doc' wrong: %+v", acts)
+	}
+	m.paletteQuery = "mail"
+	acts = m.paletteFiltered()
+	if len(acts) != 1 || acts[0].label != "open mailbox" {
+		t.Fatalf("filter 'mail' wrong: %+v", acts)
+	}
+	m.paletteQuery = "zzz"
+	if len(m.paletteFiltered()) != 0 {
+		t.Fatal("no filter match expected")
+	}
+	m.paletteQuery = ""
+	if len(m.paletteFiltered()) != len(m.paletteActions()) {
+		t.Fatal("empty query should show all")
+	}
+}
+
+func TestPaletteKeyDownThenRun(t *testing.T) {
+	m := Model{rows: []row{{bot: roster.Bot{Slug: "diana", Title: "Coder"}}}, paletteOpen: true, focus: focusSide}
+	km := tea.KeyPressMsg{Code: 'j'}
+	m2i, _ := m.updatePalette(km)
+	m2 := m2i.(Model)
+	if m2.paletteIdx != 1 {
+		t.Fatalf("idx %d want 1", m2.paletteIdx)
+	}
+	m2.paletteQuery = "refresh"
+	acts := m2.paletteFiltered()
+	if len(acts) != 1 || acts[0].label != "refresh roster" {
+		t.Fatalf("filter refresh wrong: %+v", acts)
+	}
+	m3i, _ := m2.updatePalette(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m3 := m3i.(Model)
+	if m3.paletteOpen {
+		t.Fatal("palette should be closed after run")
 	}
 }
