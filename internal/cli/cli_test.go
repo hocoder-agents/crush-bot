@@ -287,7 +287,7 @@ func TestPresetsAndCrew(t *testing.T) {
 	if code := run(env, []string{"presets"}); code != 0 {
 		t.Fatalf("presets %d %s %s", code, out.String(), errb.String())
 	}
-	for _, want := range []string{"researcher", "coder", "reviewer"} {
+	for _, want := range []string{"natasha", "diana", "andreea", "masha"} {
 		if !strings.Contains(out.String(), want) {
 			t.Fatalf("presets missing %s: %s", want, out.String())
 		}
@@ -297,16 +297,16 @@ func TestPresetsAndCrew(t *testing.T) {
 	if code := run(env, []string{"crew"}); code != 0 {
 		t.Fatalf("crew %d %s %s", code, out.String(), errb.String())
 	}
-	for _, want := range []string{"researcher", "coder", "reviewer"} {
+	for _, want := range []string{"natasha", "diana", "andreea", "masha"} {
 		if !strings.Contains(out.String(), "spawned "+want) {
 			t.Fatalf("crew missing %s: %s %s", want, out.String(), errb.String())
 		}
 	}
-	soulBody, err := os.ReadFile(filepath.Join(dir, "home", "bots", "researcher", "soul.md"))
+	soulBody, err := os.ReadFile(filepath.Join(dir, "home", "bots", "natasha", "soul.md"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(soulBody), "Researcher") {
+	if !strings.Contains(string(soulBody), "Natasha") {
 		t.Fatalf("preset soul not seeded: %s", soulBody)
 	}
 	out.Reset()
@@ -314,7 +314,7 @@ func TestPresetsAndCrew(t *testing.T) {
 	if code := run(env, []string{"crew"}); code != 0 {
 		t.Fatalf("crew again %d %s %s", code, out.String(), errb.String())
 	}
-	if !strings.Contains(out.String(), "already have @researcher") {
+	if !strings.Contains(out.String(), "already have @natasha") {
 		t.Fatalf("crew rerun: %s %s", out.String(), errb.String())
 	}
 }

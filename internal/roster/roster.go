@@ -49,10 +49,12 @@ type SpawnOpts struct {
 	Project     string
 	CloneFrom   string
 	Coder       bool
-	Sandbox     string
-	KeepAlive   bool
-	MaxBots     int
-	SoulMax     int
+	// Tools overrides the {Bash, Edit} pair when set; nil means both follow Coder.
+	Tools     *Tools
+	Sandbox   string
+	KeepAlive bool
+	MaxBots   int
+	SoulMax   int
 	// SoulBody seeds soul.md when set; otherwise the generic seed is used.
 	SoulBody string
 }
@@ -282,6 +284,10 @@ func Spawn(root string, opts SpawnOpts) (Bot, []string, error) {
 		}
 	}
 
+	tools := Tools{Bash: opts.Coder, Edit: opts.Coder}
+	if opts.Tools != nil {
+		tools = *opts.Tools
+	}
 	bot := Bot{
 		Slug:                  opts.Slug,
 		Title:                 title,
@@ -294,13 +300,10 @@ func Spawn(root string, opts SpawnOpts) (Bot, []string, error) {
 		GroupSessions:         map[string]string{},
 		Unattended:            "allowlist",
 		Sandbox:               "auto",
-		Tools: Tools{
-			Bash: opts.Coder,
-			Edit: opts.Coder,
-		},
-		CloneFrom:  cloneFrom,
-		SoulSHA256: soul.SHA256(body),
-		KeepAlive:  opts.KeepAlive,
+		Tools:                 tools,
+		CloneFrom:             cloneFrom,
+		SoulSHA256:            soul.SHA256(body),
+		KeepAlive:             opts.KeepAlive,
 	}
 	if opts.Sandbox != "" {
 		bot.Sandbox = opts.Sandbox

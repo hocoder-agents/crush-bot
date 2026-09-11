@@ -17,6 +17,10 @@ type Entry struct {
 	Title       string `yaml:"title"`
 	Description string `yaml:"description"`
 	Coder       bool   `yaml:"coder"`
+	// Bash/Edit give a sandboxed bot bash or edit without full coder mode
+	// (e.g. a read-only PR reviewer). Ignored when Coder is true.
+	Bash bool `yaml:"bash"`
+	Edit bool `yaml:"edit"`
 }
 
 type manifest struct {

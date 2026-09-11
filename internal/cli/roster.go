@@ -51,6 +51,7 @@ func cmdSpawn(io IO, args []string) int {
 		}
 	}
 	presetSoul := ""
+	var presetTools *roster.Tools
 	if *cloneFrom == "" && slug != "" {
 		if entry, soulBody, ok := preset.Get(spawn.NormalizeSlug(slug)); ok {
 			if *title == "" {
@@ -61,6 +62,9 @@ func cmdSpawn(io IO, args []string) int {
 			}
 			if !*coder {
 				*coder = entry.Coder
+				if entry.Coder || entry.Bash || entry.Edit {
+					presetTools = &roster.Tools{Bash: entry.Coder || entry.Bash, Edit: entry.Coder || entry.Edit}
+				}
 			}
 			presetSoul = soulBody
 		}
@@ -100,6 +104,7 @@ func cmdSpawn(io IO, args []string) int {
 		Sandbox:     sandboxMode,
 		KeepAlive:   *keepAlive,
 		Soul:        presetSoul,
+		Tools:       presetTools,
 	})
 	if err != nil {
 		return fail(io, err)

@@ -1,11 +1,15 @@
 presets:
-  - slug: researcher
+  - slug: natasha
     title: Researcher
     description: digs through docs and code; answers with sources
-  - slug: coder
+  - slug: diana
     title: Coder
     description: writes and runs code in a sandbox
     coder: true
-  - slug: reviewer
+  - slug: andreea
     title: Reviewer
     description: reviews diffs and designs; comments with file:line
+  - slug: masha
+    title: PR Reviewer
+    description: reviews pull requests; reads git/gh, never edits code
+    bash: true

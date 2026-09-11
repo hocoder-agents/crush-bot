@@ -71,7 +71,7 @@ crushbot clone researcher intern
 crushbot delete intern --yes
 ```
 
-Three default bots ship with crushbot: `researcher`, `coder` (`--coder`), and `reviewer`. Their souls live in `internal/preset/souls/`; spawning a preset slug seeds that soul plus its title/role, and `--title`/`--description`/`--coder` flags override.
+Four default bots ship with crushbot: `natasha` (researcher, also writes PRDs), `diana` (coder, `--coder`), `andreea` (reviewer), and `masha` (PR reviewer, bash read-only, no edit). Their souls live in `internal/preset/souls/`; spawning a preset slug seeds that soul plus its title/role, and `--title`/`--description`/`--coder` flags override.
 
 `spawn` with no flags in a TTY opens a Huh form. `soul.md` is seeded once and never overwritten.
 

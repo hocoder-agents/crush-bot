@@ -31,15 +31,22 @@ func TestManifest(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	e, body, ok := Get("coder")
+	e, body, ok := Get("diana")
 	if !ok {
-		t.Fatal("missing coder preset")
+		t.Fatal("missing diana preset")
 	}
 	if !e.Coder {
-		t.Fatal("coder preset should set coder")
+		t.Fatal("diana preset should set coder")
 	}
 	if strings.TrimSpace(body) == "" || !strings.Contains(body, "# Identity") {
 		t.Fatalf("bad soul body: %q", body)
+	}
+	mb, _, ok := Get("masha")
+	if !ok {
+		t.Fatal("missing masha preset")
+	}
+	if mb.Coder || !mb.Bash || mb.Edit {
+		t.Fatalf("masha should be bash-only: %+v", mb)
 	}
 	if _, _, ok := Get("nobody"); ok {
 		t.Fatal("unknown preset should not match")
