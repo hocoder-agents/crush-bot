@@ -27,7 +27,7 @@ func (m Model) paletteActions() []action {
 		{label: "spawn a bot", hint: "n", run: func(m Model) (tea.Model, tea.Cmd) {
 			return m.openSpawnForm()
 		}},
-		{label: "create group", hint: "", run: func(m Model) (tea.Model, tea.Cmd) {
+		{label: "create group", hint: "g", run: func(m Model) (tea.Model, tea.Cmd) {
 			return m.openGroupForm()
 		}},
 		{label: "refresh roster", hint: "r", run: func(m Model) (tea.Model, tea.Cmd) {

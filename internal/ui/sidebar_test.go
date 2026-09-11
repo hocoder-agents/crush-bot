@@ -253,3 +253,25 @@ func TestGroupFormTogglesAndGuard(t *testing.T) {
 		t.Fatalf("cursor not on new room: %+v", m.rows)
 	}
 }
+
+func TestFormInputsFocusable(t *testing.T) {
+	home := t.TempDir()
+	if err := roster.Save(home, roster.Bot{Slug: "diana", Title: "Coder"}); err != nil {
+		t.Fatal(err)
+	}
+	base := Model{home: home}
+	mi, _ := base.openGroupForm()
+	m := mi.(Model)
+	mi, _ = m.updateGroupForm(tea.KeyPressMsg{Code: 'r', Text: "r"})
+	m = mi.(Model)
+	if m.groupForm.id.Value() != "r" {
+		t.Fatalf("typing into room id failed: %q", m.groupForm.id.Value())
+	}
+	mi, _ = base.openSpawnForm()
+	m = mi.(Model)
+	mi, _ = m.updateSpawnForm(tea.KeyPressMsg{Code: 'x', Text: "x"})
+	m = mi.(Model)
+	if m.spawnForm.slug.Value() != "x" {
+		t.Fatalf("typing into slug failed: %q", m.spawnForm.slug.Value())
+	}
+}

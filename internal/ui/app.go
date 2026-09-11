@@ -378,6 +378,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case "n":
 			return m.openSpawnForm()
+		case "g":
+			return m.openGroupForm()
 		case "enter":
 			return m.openSelected()
 		}
@@ -690,10 +692,10 @@ func (m Model) helpView(width int) string {
 			keyStyle.Render("j/k"), keyStyle.Render("tab"), keyStyle.Render("enter"),
 			keyStyle.Render("R"), keyStyle.Render("esc"), keyStyle.Render("q"))
 	default:
-		s = fmt.Sprintf("%s move  %s chat  %s inbox  %s new  %s refresh  %s quicklaunch  %s quit",
+		s = fmt.Sprintf("%s move  %s chat  %s inbox  %s bot  %s group  %s refresh  %s quicklaunch  %s quit",
 			keyStyle.Render("j/k"), keyStyle.Render("enter"), keyStyle.Render("i"),
-			keyStyle.Render("n"), keyStyle.Render("r"), keyStyle.Render(":"),
-			keyStyle.Render("q"))
+			keyStyle.Render("n"), keyStyle.Render("g"), keyStyle.Render("r"),
+			keyStyle.Render(":"), keyStyle.Render("q"))
 	}
 	return helpStyle.Width(width).MaxWidth(width).Render(s)
 }

@@ -52,11 +52,9 @@ func (m Model) openSpawnForm() (tea.Model, tea.Cmd) {
 		title:  newFormInput("display name, e.g. Coder"),
 		desc:   newFormInput("one-line role"),
 	}
-	if len(m.rows) > 0 {
-		m.spawnForm.slug.SetValue("")
-	}
+	cmd := m.spawnForm.slug.Focus()
 	m.status = "new bot"
-	return m, nil
+	return m, cmd
 }
 
 func (m Model) openGroupForm() (tea.Model, tea.Cmd) {
@@ -68,8 +66,9 @@ func (m Model) openGroupForm() (tea.Model, tea.Cmd) {
 		bots:   bots,
 		chosen: map[string]bool{},
 	}
+	cmd := m.groupForm.id.Focus()
 	m.status = "new group"
-	return m, nil
+	return m, cmd
 }
 
 func (m Model) formActive() bool {
@@ -179,10 +178,13 @@ func (m Model) updateSpawnForm(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			f.step = 1
+			return m, f.title.Focus()
 		case 1:
 			f.step = 2
+			return m, f.desc.Focus()
 		case 2:
 			f.step = 3
+			return m, nil
 		case 3:
 			return m.submitSpawnForm()
 		}
