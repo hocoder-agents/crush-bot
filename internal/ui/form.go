@@ -72,7 +72,7 @@ func (m Model) openGroupForm() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) formActive() bool {
-	return m.spawnForm.active || m.groupForm.active
+	return m.spawnForm.active || m.groupForm.active || m.projectForm.active
 }
 
 func formErrView(err string) string {

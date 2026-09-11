@@ -16,14 +16,31 @@ import (
 
 type projectFormState struct {
 	active bool
+	find   bool // /-mode: search all of ~ instead of the configured roots
+	query  string
 	items  []string // absolute repo paths
 	cursor int
 	err    string
 }
 
+func homeRepos(query string) []string {
+	home, _ := os.UserHomeDir()
+	var out []string
+	for _, dir := range gitProjectsDepth([]string{home}, 3) {
+		if query == "" || strings.Contains(strings.ToLower(projectDisplay(dir)), strings.ToLower(query)) {
+			out = append(out, dir)
+		}
+	}
+	return out
+}
+
 // gitProjects walks the configured project roots (depth 2) collecting
 // directories that look like git checkouts.
 func gitProjects(roots []string) []string {
+	return gitProjectsDepth(roots, 2)
+}
+
+func gitProjectsDepth(roots []string, maxDepth int) []string {
 	home, _ := os.UserHomeDir()
 	var out []string
 	seen := map[string]bool{}
@@ -35,14 +52,14 @@ func gitProjects(roots []string) []string {
 	}
 	var walk func(dir string, depth int)
 	walk = func(dir string, depth int) {
-		if depth > 2 {
+		if depth > maxDepth {
 			return
 		}
 		if _, err := os.Stat(filepath.Join(dir, ".git")); err == nil && !seen[dir] {
 			seen[dir] = true
 			out = append(out, dir)
 		}
-		if depth == 2 {
+		if depth == maxDepth {
 			return
 		}
 		entries, err := os.ReadDir(dir)
@@ -70,18 +87,13 @@ func projectDisplay(dir string) string {
 }
 
 func (m Model) openProjectForm() (tea.Model, tea.Cmd) {
-	cfg, err := config.Load(config.ResolvePaths())
-	if err != nil {
-		m.status = err.Error()
-		return m, nil
-	}
-	items := gitProjects(cfg.ProjectRoots)
+	items := gitProjects(m.projectRoots())
 	if len(items) == 0 {
-		m.status = "no git repos found under project roots (" + strings.Join(cfg.ProjectRoots, ", ") + ")"
+		m.status = "no git repos found under project roots (" + strings.Join(m.projectRoots(), ", ") + ")"
 		return m, nil
 	}
 	m.projectForm = projectFormState{active: true, items: items}
-	m.status = "pick a project for the crew"
+	m.status = "pick a project for the crew (/ to search all of ~)"
 	return m, nil
 }
 
@@ -89,10 +101,27 @@ func (m Model) updateProjectForm(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	f := &m.projectForm
 	switch msg.String() {
 	case "esc":
+		if f.find {
+			f.find = false
+			f.query = ""
+			f.items = gitProjects(m.projectRoots())
+			f.cursor = 0
+			return m, nil
+		}
 		f.active = false
 		m.status = "cancelled"
 		return m, nil
+	case "/":
+		if !f.find {
+			f.find = true
+			f.query = ""
+			f.cursor = 0
+		}
+		return m, nil
 	case "enter":
+		if len(f.items) == 0 {
+			return m, nil
+		}
 		return m.applyProject(f.items[f.cursor])
 	case "j", "down":
 		if f.cursor < len(f.items)-1 {
@@ -104,15 +133,46 @@ func (m Model) updateProjectForm(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			f.cursor--
 		}
 		return m, nil
+	case "backspace", "delete":
+		if f.find && f.query != "" {
+			r := []rune(f.query)
+			f.query = string(r[:len(r)-1])
+			f.items = homeRepos(f.query)
+			f.cursor = 0
+		}
+		return m, nil
+	}
+	if f.find {
+		for _, r := range msg.String() {
+			f.query += string(r)
+		}
+		f.items = homeRepos(f.query)
+		f.cursor = 0
 	}
 	return m, nil
+}
+
+// projectRoots is the configured scan base for list mode.
+func (m Model) projectRoots() []string {
+	cfg, err := config.Load(config.ResolvePaths())
+	if err != nil {
+		return []string{"~/repos"}
+	}
+	return cfg.ProjectRoots
 }
 
 func (m Model) projectView(width, height int) string {
 	f := m.projectForm
 	var b strings.Builder
-	fmt.Fprintln(&b, gradientText("project")+"  "+mutedStyle.Render("aim the crew at a repo"))
+	head := gradientText("project") + "  " + mutedStyle.Render("aim the crew at a repo")
+	if f.find {
+		head += "  " + keyStyle.Render("/"+f.query)
+	}
+	fmt.Fprintln(&b, head)
 	fmt.Fprintln(&b)
+	if len(f.items) == 0 {
+		fmt.Fprintln(&b, mutedStyle.Render("no git repos found — keep typing to narrow the search"))
+	}
 	for i, dir := range f.items {
 		mark := " "
 		if i == f.cursor {
