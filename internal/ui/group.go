@@ -42,18 +42,11 @@ func newGroupModel(home, bin string, cfg config.Config, g group.Group) groupMode
 
 func (m *groupModel) reloadTranscript() {
 	lines, _ := group.ReadTranscript(m.home, m.g.ID)
-	var b strings.Builder
-	for _, l := range lines {
-		kind := l.Kind
-		if l.Pass {
-			kind = "pass"
-		}
-		fmt.Fprintf(&b, "%s  %s  %s\n", kind, l.From, l.Body)
+	body := renderRoomTranscript(lines)
+	if body == "" {
+		body = mutedStyle.Render("(empty room — type a line to start a round)") + "\n"
 	}
-	if b.Len() == 0 {
-		b.WriteString("(empty room — type a line to start a round)\n")
-	}
-	m.vp.SetContent(b.String())
+	m.vp.SetContent(body)
 	m.vp.GotoBottom()
 }
 
@@ -133,7 +126,7 @@ func (m groupModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m groupModel) View() tea.View {
 	var b strings.Builder
-	fmt.Fprintln(&b, titleStyle.Render("group @"+m.g.ID))
+	fmt.Fprintln(&b, gradientText("group @"+m.g.ID))
 	fmt.Fprintln(&b, mutedStyle.Render(strings.Join(m.g.Members, "  ")+"  ·  "+m.status))
 	fmt.Fprintln(&b, m.vp.View())
 	fmt.Fprintln(&b, keyStyle.Render("> ")+m.in.View())

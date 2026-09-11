@@ -296,3 +296,31 @@ func TestSpinnerRendersInViews(t *testing.T) {
 		t.Fatalf("chat head missing thinking:\n%s", out2)
 	}
 }
+
+func TestRoomTranscriptRendering(t *testing.T) {
+	lines := []group.Line{
+		{Round: 0, From: "user", Kind: "line", Body: "hash it out"},
+		{Round: 1, From: "diana", Kind: "line", Body: "my take: slice it"},
+		{Round: 1, From: "sophie", Kind: "pass", Body: "PASS", Pass: true},
+		{Round: 1, From: "diana", Kind: "system", Body: "wake failed: boom"},
+	}
+	out := renderRoomTranscript(lines)
+	if !strings.Contains(out, "you") {
+		t.Fatalf("user line missing: %s", out)
+	}
+	if !strings.Contains(out, "@diana") || !strings.Contains(out, "my take") && !strings.Contains(out, "slice it") {
+		t.Fatalf("bot line missing: %s", out)
+	}
+	if !strings.Contains(out, "round 1") {
+		t.Fatalf("round divider missing: %s", out)
+	}
+	if !strings.Contains(out, "sophie passed") {
+		t.Fatalf("pass line missing: %s", out)
+	}
+	if !strings.Contains(out, "wake failed") {
+		t.Fatalf("system note missing: %s", out)
+	}
+	if !strings.Contains(out, "38;5;205m") {
+		t.Fatalf("no ANSI color in speaker names: %s", out)
+	}
+}
