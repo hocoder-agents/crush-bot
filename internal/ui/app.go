@@ -200,6 +200,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Roster busy flags and pending counts go stale without polling;
 		// this is what makes the thinking spinners appear for daemon wakes.
 		m.reload()
+		if m.chatGroup != "" {
+			// Rounds run in the daemon; the transcript file is the feed.
+			m.reloadGroupChat()
+		}
 		return m, refreshTick()
 	case spinner.TickMsg:
 		var c1, c2 tea.Cmd
@@ -215,15 +219,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.chatGroup != "" {
 			m.reloadGroupChat()
 		}
+	case groupQueuedMsg:
+		m.chatBusy = false
+		m.reloadGroupChat()
+		return m, m.in.Focus()
 	case groupDoneMsg:
 		m.chatBusy = false
 		m.groupBusy = false
-		m.reload()
 		m.reloadGroupChat()
 		if msg.err != nil {
-			m.status = "round failed: " + msg.err.Error()
+			m.status = "round enqueue failed: " + msg.err.Error()
 		} else {
-			m.status = "round done @" + m.chatGroup
+			m.status = "round queued @" + m.chatGroup
 		}
 		return m, m.in.Focus()
 	case sayDoneMsg:
