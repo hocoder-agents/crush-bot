@@ -7,6 +7,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/hocoder-agents/crush-bot/internal/group"
 )
@@ -41,7 +42,7 @@ func (m *Model) reloadGroupChat() {
 		}
 	}
 	lines, _ := group.ReadTranscript(m.home, m.chatGroup)
-	body := renderRoomTranscript(lines)
+	body := renderRoomTranscript(lines, m.vp.Width())
 	if body == "" {
 		body = mutedStyle.Render("(empty room — type a line to start a round)") + "\n"
 	}
@@ -77,8 +78,9 @@ func userStyle() lipgloss.Style {
 }
 
 // renderRoomTranscript lays out a room log: round dividers, colored
-// speaker names, dimmed passes and system notes.
-func renderRoomTranscript(lines []group.Line) string {
+// speaker names, dimmed passes and system notes. Lines wrap to the
+// pane width with continuation lines indented under the speaker.
+func renderRoomTranscript(lines []group.Line, width int) string {
 	var b strings.Builder
 	prev := -1
 	for _, l := range lines {
@@ -90,20 +92,44 @@ func renderRoomTranscript(lines []group.Line) string {
 		}
 		switch {
 		case l.Kind == "system":
-			fmt.Fprintf(&b, "%s\n", mutedStyle.Render("   ⚠ "+l.Body))
+			fmt.Fprintln(&b, wrapRoomLine(mutedStyle.Render("   ⚠ "+l.Body), "", width))
 		case l.Pass || l.Kind == "pass":
 			note := "passed"
 			if l.Body != "" && l.Body != "PASS" {
 				note = l.Body
 			}
-			fmt.Fprintf(&b, "%s\n", mutedStyle.Render("   · "+l.From+" "+note))
+			fmt.Fprintln(&b, wrapRoomLine(mutedStyle.Render("   · "+l.From+" "+note), "", width))
 		case l.From == "user":
-			fmt.Fprintf(&b, "%s  %s\n", userStyle().Render("you"), l.Body)
+			fmt.Fprintln(&b, wrapRoomLine(userStyle().Render("you"), l.Body, width))
 		default:
-			fmt.Fprintf(&b, "%s  %s\n", memberStyle(l.From).Render("@"+l.From), l.Body)
+			fmt.Fprintln(&b, wrapRoomLine(memberStyle(l.From).Render("@"+l.From), l.Body, width))
 		}
 	}
 	return b.String()
+}
+
+// wrapRoomLine word-wraps a transcript line to the pane width, indenting
+// continuation lines under the message so a paragraph still reads as one
+// speaker turn. ANSI styles in the prefix survive the wrap.
+func wrapRoomLine(prefix, body string, width int) string {
+	if width <= 0 || body == "" {
+		if body == "" {
+			return prefix
+		}
+		return prefix + "  " + body
+	}
+	limit := width - 2 - lipgloss.Width(prefix)
+	if limit < 12 {
+		limit = 12
+	}
+	wrapped := ansi.Wordwrap(body, limit, " \t-")
+	parts := strings.Split(wrapped, "\n")
+	indent := strings.Repeat(" ", lipgloss.Width(prefix)+2)
+	out := prefix + "  " + parts[0]
+	for _, l := range parts[1:] {
+		out += "\n" + indent + l
+	}
+	return out
 }
 
 func (m Model) groupView(width, height int) string {

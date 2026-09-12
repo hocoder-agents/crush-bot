@@ -43,7 +43,11 @@ func newGroupModel(home, bin string, cfg config.Config, g group.Group) groupMode
 
 func (m *groupModel) reloadTranscript() {
 	lines, _ := group.ReadTranscript(m.home, m.g.ID)
-	body := renderRoomTranscript(lines)
+	w := m.width - 4
+	if m.width <= 0 || w < 10 {
+		w = 0
+	}
+	body := renderRoomTranscript(lines, w)
 	if body == "" {
 		body = mutedStyle.Render("(empty room — type a line to start a round)") + "\n"
 	}

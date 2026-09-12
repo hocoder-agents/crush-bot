@@ -305,7 +305,7 @@ func TestRoomTranscriptRendering(t *testing.T) {
 		{Round: 1, From: "sophie", Kind: "pass", Body: "PASS", Pass: true},
 		{Round: 1, From: "diana", Kind: "system", Body: "wake failed: boom"},
 	}
-	out := renderRoomTranscript(lines)
+	out := renderRoomTranscript(lines, 0)
 	if !strings.Contains(out, "you") {
 		t.Fatalf("user line missing: %s", out)
 	}
@@ -485,5 +485,32 @@ func TestProjectModalKeysAndFind(t *testing.T) {
 	m = mi.(Model)
 	if m.projectForm.find || !m.projectForm.active {
 		t.Fatalf("esc should leave find mode but keep the modal open")
+	}
+}
+
+func TestRoomTranscriptWraps(t *testing.T) {
+	lines := []group.Line{
+		{Round: 1, From: "diana", Kind: "line", Body: strings.Repeat("word ", 40)},
+		{Round: 1, From: "sophie", Kind: "pass", Body: "PASS", Pass: true},
+	}
+	out := renderRoomTranscript(lines, 40)
+	if !strings.Contains(out, "\n") || len(strings.Split(out, "\n")) < 4 {
+		t.Fatalf("long line not wrapped:\n%s", out)
+	}
+	// continuation lines are indented under the speaker name
+	// every rendered line fits the pane width; continuation lines are
+	// indented under the speaker name
+	for _, l := range strings.Split(out, "\n") {
+		if lipgloss.Width(l) > 40 {
+			t.Fatalf("line wider than the pane")
+		}
+	}
+	if !strings.Contains(out, "      word") {
+		t.Fatalf("continuation lines not indented")
+	}
+	// width 0: legacy no-wrap behavior
+	out = renderRoomTranscript(lines, 0)
+	if strings.Contains(strings.Split(out, "\n")[1], "\n") {
+		t.Fatal("width 0 should not wrap")
 	}
 }
