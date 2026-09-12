@@ -514,3 +514,38 @@ func TestRoomTranscriptWraps(t *testing.T) {
 		t.Fatal("width 0 should not wrap")
 	}
 }
+
+func TestRoomTranscriptTurnSpacing(t *testing.T) {
+	lines := []group.Line{
+		{Round: 0, From: "user", Kind: "line", Body: "start"},
+		{Round: 1, From: "diana", Kind: "line", Body: "first reply"},
+		{Round: 1, From: "andreea", Kind: "line", Body: "second reply"},
+		{Round: 1, From: "sophie", Kind: "pass", Body: "PASS", Pass: true},
+	}
+	out := renderRoomTranscript(lines, 40)
+	split := strings.Split(out, "\n")
+	find := func(marker string) int {
+		for i, l := range split {
+			if strings.Contains(l, marker) {
+				return i
+			}
+		}
+		t.Fatalf("missing %q in:\n%s", marker, out)
+		return -1
+	}
+	user := find("start")
+	diana := find("first reply")
+	andreea := find("second reply")
+	pass := find("sophie passed")
+	// exactly one blank line between consecutive turns within a round
+	if diana != user+2 {
+		t.Fatalf("no blank line between user and diana:\n%s", out)
+	}
+	if andreea != diana+2 {
+		t.Fatalf("no blank line between diana and andreea:\n%s", out)
+	}
+	// passes and system notes do not add turn spacing
+	if pass != andreea+1 {
+		t.Fatalf("pass should follow immediately:\n%s", out)
+	}
+}

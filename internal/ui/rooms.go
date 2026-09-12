@@ -83,13 +83,20 @@ func userStyle() lipgloss.Style {
 func renderRoomTranscript(lines []group.Line, width int) string {
 	var b strings.Builder
 	prev := -1
+	prevTurn := false
 	for _, l := range lines {
+		isTurn := !l.Pass && l.Kind != "pass" && l.Kind != "system"
 		if l.Round != prev {
 			prev = l.Round
 			if l.Round > 0 && b.Len() > 0 {
 				fmt.Fprintln(&b, mutedStyle.Render(fmt.Sprintf("──  round %d  ──", l.Round)))
 			}
+			prevTurn = false
+		} else if isTurn && prevTurn && b.Len() > 0 {
+			// One blank line between speaker turns within a round.
+			fmt.Fprintln(&b)
 		}
+		prevTurn = isTurn
 		switch {
 		case l.Kind == "system":
 			fmt.Fprintln(&b, wrapRoomLine(mutedStyle.Render("   ⚠ "+l.Body), "", width))
