@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -14,20 +13,22 @@ import (
 	"github.com/hocoder-agents/crush-bot/internal/group"
 )
 
-type settleMsg struct{ err error }
 type tickMsg time.Time
+type enqueueErr struct{ err error }
 
+// Settle rounds are executed by the daemon (which outlives this TUI);
+// sending just enqueues a request and the 200ms tick replays the
+// transcript the daemon writes.
 type groupModel struct {
-	home, bin string
-	cfg       config.Config
-	g         group.Group
-	vp        viewport.Model
-	in        textinput.Model
-	width     int
-	height    int
-	settling  bool
-	status    string
-	cancel    context.CancelFunc
+	home   string
+	bin    string
+	cfg    config.Config
+	g      group.Group
+	vp     viewport.Model
+	in     textinput.Model
+	width  int
+	height int
+	status string
 }
 
 func newGroupModel(home, bin string, cfg config.Config, g group.Group) groupModel {
@@ -71,44 +72,33 @@ func (m groupModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.in.SetWidth(msg.Width - 6)
 	case tickMsg:
 		m.reloadTranscript()
-		cmds = append(cmds, tea.Tick(200*time.Millisecond, func(t time.Time) tea.Msg { return tickMsg(t) }))
-	case settleMsg:
-		m.settling = false
-		if m.cancel != nil {
-			m.cancel()
-			m.cancel = nil
-		}
-		if msg.err != nil {
-			m.status = msg.err.Error()
-		} else {
+		switch {
+		case group.RoomBusy(m.home, m.g.ID, m.g.Members):
+			m.status = "round running…"
+		case m.status == "round running…":
 			m.status = "idle"
 		}
-		m.reloadTranscript()
+		cmds = append(cmds, tea.Tick(200*time.Millisecond, func(t time.Time) tea.Msg { return tickMsg(t) }))
+	case enqueueErr:
+		if msg.err != nil {
+			m.status = "enqueue failed: " + msg.err.Error()
+		} else {
+			m.status = "round queued — the daemon runs it"
+		}
 	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "ctrl+c", "esc":
-			if m.cancel != nil {
-				m.cancel()
-			}
 			return m, tea.Quit
 		case "enter":
-			if m.settling {
-				break
-			}
 			line := strings.TrimSpace(m.in.Value())
 			if line == "" {
 				break
 			}
 			m.in.SetValue("")
-			m.settling = true
-			m.status = "round running…"
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
-			m.cancel = cancel
+			home := m.home
 			g := m.g
-			home, bin, cfg := m.home, m.bin, m.cfg
 			cmds = append(cmds, func() tea.Msg {
-				err := group.RunUntilSettle(ctx, cfg, bin, home, g, line)
-				return settleMsg{err}
+				return enqueueErr{err: group.EnqueueRequest(home, g.ID, line)}
 			})
 		}
 	}
@@ -130,7 +120,7 @@ func (m groupModel) View() tea.View {
 	fmt.Fprintln(&b, mutedStyle.Render(strings.Join(m.g.Members, "  ")+"  ·  "+m.status))
 	fmt.Fprintln(&b, m.vp.View())
 	fmt.Fprintln(&b, keyStyle.Render("> ")+m.in.View())
-	fmt.Fprintln(&b, mutedStyle.Render("enter send  ·  esc quit  (rounds keep going if you leave)"))
+	fmt.Fprintln(&b, mutedStyle.Render("enter send  ·  esc quit  (the daemon runs rounds — you can leave anytime)"))
 	body := b.String()
 	if m.width > 0 {
 		body = boxStyle.Width(m.width).Render(body)

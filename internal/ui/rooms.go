@@ -1,17 +1,13 @@
 package ui
 
 import (
-	"context"
 	"fmt"
 	"hash/fnv"
 	"strings"
-	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
-	"github.com/hocoder-agents/crush-bot/internal/config"
-	"github.com/hocoder-agents/crush-bot/internal/crush"
 	"github.com/hocoder-agents/crush-bot/internal/group"
 )
 
@@ -37,6 +33,12 @@ func padStyle(width int) lipgloss.Style {
 func (m *Model) reloadGroupChat() {
 	if m.chatGroup == "" {
 		return
+	}
+	for _, g := range m.groups {
+		if g.ID == m.chatGroup {
+			m.groupBusy = group.RoomBusy(m.home, g.ID, g.Members)
+			break
+		}
 	}
 	lines, _ := group.ReadTranscript(m.home, m.chatGroup)
 	body := renderRoomTranscript(lines)
@@ -122,25 +124,14 @@ func (m Model) groupView(width, height int) string {
 func (m Model) sendGroup(line string) tea.Cmd {
 	m.chatBusy = true
 	m.groupBusy = true
-	m.status = "round running in @" + m.chatGroup
 	gid := m.chatGroup
 	home := m.home
+	m.status = "round queued in @" + gid + " (daemon runs it)"
 	return func() tea.Msg {
-		cfg, err := config.Load(config.ResolvePaths())
-		if err != nil {
+		if err := group.EnqueueRequest(home, gid, line); err != nil {
 			return groupDoneMsg{err: err}
 		}
-		bin, err := crush.LookPath(cfg.CrushPath)
-		if err != nil {
-			return groupDoneMsg{err: err}
-		}
-		g, err := group.Load(home, gid)
-		if err != nil {
-			return groupDoneMsg{err: err}
-		}
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
-		defer cancel()
-		return groupDoneMsg{err: group.RunUntilSettle(ctx, cfg, bin, home, g, line)}
+		return groupQueuedMsg{gid: gid}
 	}
 }
 
@@ -161,3 +152,5 @@ func (m Model) disbandUnderCursor() (tea.Model, tea.Cmd) {
 	m.status = "disbanded @" + g.ID
 	return m, nil
 }
+
+type groupQueuedMsg struct{ gid string }

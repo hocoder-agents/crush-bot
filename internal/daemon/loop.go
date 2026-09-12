@@ -118,8 +118,13 @@ func Once(ctx context.Context, o Options) (int, error) {
 		}()
 	}
 	wg.Wait()
+	sweepRounds(ctx, o, &rounds)
 	return woke, nil
 }
+
+// rounds tracks in-flight settle loops per room so the sweeper never
+// double-runs a room and recovery leaves live rounds alone.
+var rounds sync.Map
 
 func expireOld(home string, maxAge time.Duration) {
 	if maxAge <= 0 {
