@@ -338,6 +338,82 @@ func SetHidden(root, slug string, hidden bool) (Bot, error) {
 	return bot, Save(root, bot)
 }
 
+// UpdateOpts is a patch of editable bot properties; only Set fields change.
+type UpdateOpts struct {
+	Title       Opt[string]
+	Description Opt[string]
+	Model       Opt[string]
+	Project     Opt[string]
+	Hidden      Opt[bool]
+	KeepAlive   Opt[bool]
+	Coder       Opt[bool]
+	Bash        Opt[bool]
+	Edit        Opt[bool]
+}
+
+type Opt[T any] struct {
+	Value T
+	Set   bool
+}
+
+func StrOpt(v string) Opt[string] { return Opt[string]{Value: v, Set: true} }
+func BoolOpt(v bool) Opt[bool]    { return Opt[bool]{Value: v, Set: true} }
+
+// Update patches bot.yaml fields the operator may edit and returns warnings
+// (shared project). Managed fields (session ids, timestamps) are untouched.
+func Update(root, slug string, opts UpdateOpts) (Bot, []string, error) {
+	bot, err := Load(root, slug)
+	if err != nil {
+		return Bot{}, nil, err
+	}
+	var warns []string
+	if opts.Project.Set {
+		proj := strings.TrimSpace(opts.Project.Value)
+		if proj != "" && !filepath.IsAbs(proj) {
+			return Bot{}, warns, fmt.Errorf("project must be an absolute path")
+		}
+		bot.Project = proj
+		if proj != "" {
+			share, err := SharedProject(root, proj, slug)
+			if err != nil {
+				return Bot{}, warns, err
+			}
+			if len(share) > 0 {
+				warns = append(warns, "shared project with "+strings.Join(share, ", "))
+			}
+		}
+	}
+	if opts.Title.Set {
+		bot.Title = strings.TrimSpace(opts.Title.Value)
+	}
+	if opts.Description.Set {
+		bot.Description = strings.TrimSpace(opts.Description.Value)
+	}
+	if opts.Model.Set {
+		bot.Model = strings.TrimSpace(opts.Model.Value)
+	}
+	if opts.KeepAlive.Set {
+		bot.KeepAlive = opts.KeepAlive.Value
+	}
+	if opts.Coder.Set {
+		bot.Tools.Bash = opts.Coder.Value
+		bot.Tools.Edit = opts.Coder.Value
+	}
+	if opts.Bash.Set {
+		bot.Tools.Bash = opts.Bash.Value
+	}
+	if opts.Edit.Set {
+		bot.Tools.Edit = opts.Edit.Value
+	}
+	if opts.Hidden.Set {
+		bot.Hidden = opts.Hidden.Value
+	}
+	if err := Save(root, bot); err != nil {
+		return Bot{}, warns, err
+	}
+	return bot, warns, nil
+}
+
 func Delete(root, slug string) error {
 	if !Exists(root, slug) {
 		return fmt.Errorf("unknown bot %s", slug)

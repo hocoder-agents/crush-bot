@@ -66,6 +66,76 @@ func TestSpawnSoulBody(t *testing.T) {
 	}
 }
 
+func TestUpdatePatch(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "bots"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	b, _, err := Spawn(root, SpawnOpts{Slug: "sophie", Title: "Sophie", Project: "/tmp/proj-a"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	created := b.CreatedAt
+	sid := b.CanonicalSessionID
+
+	if _, _, err := Update(root, "sophie", UpdateOpts{
+		Title:  StrOpt("Sophie Prime"),
+		Bash:   BoolOpt(true),
+		Edit:   BoolOpt(true),
+		Hidden: BoolOpt(true),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := Load(root, "sophie")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Title != "Sophie Prime" || got.Hidden != true {
+		t.Fatalf("patch not applied: %+v", got)
+	}
+	if !got.Tools.Bash || !got.Tools.Edit {
+		t.Fatalf("tools not enabled: %+v", got.Tools)
+	}
+	if got.CreatedAt != created || got.CanonicalSessionID != sid {
+		t.Fatal("managed fields changed")
+	}
+	if got.Project != "/tmp/proj-a" {
+		t.Fatalf("unset field clobbered: %q", got.Project)
+	}
+
+	// relative project is rejected
+	if _, _, err := Update(root, "sophie", UpdateOpts{Project: StrOpt("rel/path")}); err == nil {
+		t.Fatal("want relative project error")
+	}
+
+	// unset fields are untouched by a no-op patch
+	if _, _, err := Update(root, "sophie", UpdateOpts{}); err != nil {
+		t.Fatal(err)
+	}
+	got, err = Load(root, "sophie")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Title != "Sophie Prime" || got.Hidden != true {
+		t.Fatalf("no-op patch changed fields: %+v", got)
+	}
+
+	// shared project warns
+	if _, _, err := Update(root, "sophie", UpdateOpts{Hidden: BoolOpt(false)}); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := Spawn(root, SpawnOpts{Slug: "peer", Title: "Peer"}); err != nil {
+		t.Fatal(err)
+	}
+	_, warns, err := Update(root, "peer", UpdateOpts{Project: StrOpt("/tmp/proj-a")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(warns) == 0 {
+		t.Fatal("want shared-project warning")
+	}
+}
+
 func TestSpawnDuplicate(t *testing.T) {
 	root := t.TempDir()
 	os.MkdirAll(filepath.Join(root, "bots"), 0o700)

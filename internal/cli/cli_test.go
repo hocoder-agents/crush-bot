@@ -202,6 +202,49 @@ func TestSayAndDoctor(t *testing.T) {
 	}
 }
 
+func TestEditFlagsRegenerateProtocol(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("CRUSHBOT_HOME", filepath.Join(dir, "home"))
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(dir, "cfg"))
+	installFakeCrush(t)
+	var out, errb bytes.Buffer
+	env := IO{Out: &out, Err: &errb, In: strings.NewReader("")}
+	run(env, []string{"init"})
+	run(env, []string{"spawn", "sophie"})
+	run(env, []string{"spawn", "peer"})
+
+	out.Reset()
+	errb.Reset()
+	if code := run(env, []string{"edit", "sophie", "--title", "Sophie Prime", "--project", "/tmp/proj-e", "--coder"}); code != 0 {
+		t.Fatalf("edit %d %s %s", code, out.String(), errb.String())
+	}
+	if !strings.Contains(out.String(), "edited sophie") {
+		t.Fatalf("out: %s", out.String())
+	}
+	proto, err := os.ReadFile(filepath.Join(dir, "home", "bots", "sophie", "protocol.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(proto), "Sophie Prime") || !strings.Contains(string(proto), "/tmp/proj-e") {
+		t.Fatalf("protocol not regenerated: %s", proto)
+	}
+	rc, err := os.ReadFile(filepath.Join(dir, "home", "bots", "sophie", "crushrc.d", "10-host.crushrc"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(rc), "permissions allow bash") {
+		t.Fatalf("crushrc not updated for coder: %s", rc)
+	}
+
+	out.Reset()
+	if code := run(env, []string{"show", "sophie"}); code != 0 {
+		t.Fatal(errb.String())
+	}
+	if !strings.Contains(out.String(), "Sophie Prime") {
+		t.Fatalf("show: %s", out.String())
+	}
+}
+
 func TestMentionBroadcast(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("CRUSHBOT_HOME", filepath.Join(dir, "home"))

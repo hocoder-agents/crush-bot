@@ -75,6 +75,17 @@ Four default bots ship with crushbot: `natasha` (researcher, also writes PRDs), 
 
 `spawn` with no flags in a TTY opens a Huh form. `soul.md` is seeded once and never overwritten.
 
+### Edit a bot
+
+```bash
+crushbot edit sophie                    # Huh form (TTY)
+crushbot edit sophie --title "Sophie Prime" --project /path/to/repo --coder
+```
+
+Editable: title, description, model, project, coder/bash/edit tools, keepalive, hidden.
+`bot.yaml` is updated and `protocol.md`/`crushrc`/hooks are regenerated in the same step.
+In the mesh TUI, focus a bot and press `e` for the same form.
+
 ### Talk to one bot
 
 ```bash
@@ -126,7 +137,7 @@ crushbot                  # or: crushbot mesh
 
 Roster on the left (an `agents` section, then `groups`); the right pane is that bot’s Crush **session transcript** plus a prompt (`crush run`, same as `say`). Bots hold a lavender braille spinner while a turn is in flight, and the open room spins pink while a settle round runs.
 
-Keys: `enter` opens chat (or the selected room), type a line and `enter` to send, `pgup`/`pgdn` scroll, `i` opens the mailbox, `ctrl+g` returns to the list, `n` spawns a bot (modal form), `g` creates a group (room id + member picker), `:` or `?` opens the quicklaunch panel (type-to-filter commands, including disband room and `doctor --check`), `r` refreshes, `q` / `ctrl+q` quits. Full Crush TUI is still `crushbot chat <slug>`. `--plain` prints a table.
+Keys: `enter` opens chat (or the selected room), type a line and `enter` to send, `pgup`/`pgdn` scroll, `i` opens the mailbox, `ctrl+g` returns to the list, `n` spawns a bot (modal form), `e` edits the selected bot (modal form), `g` creates a group (room id + member picker), `:` or `?` opens the quicklaunch panel (type-to-filter commands, including disband room and `doctor --check`), `r` refreshes, `q` / `ctrl+q` quits. Full Crush TUI is still `crushbot chat <slug>`. `--plain` prints a table.
 
 ### Keep-alive Crush server
 

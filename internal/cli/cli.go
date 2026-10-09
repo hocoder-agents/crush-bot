@@ -58,6 +58,8 @@ func run(io IO, args []string) int {
 		return cmdList(io, rest)
 	case "show":
 		return cmdShow(io, rest)
+	case "edit":
+		return cmdEdit(io, rest)
 	case "soul":
 		return cmdSoul(io, rest)
 	case "hide":
@@ -181,6 +183,7 @@ func printHelp(w io.Writer) {
 	row("crew", "spawn every missing default bot")
 	row("list", "roster table; --json --all")
 	row("show", "inspect one bot")
+	row("edit", "edit bot properties (form or flags)")
 	row("soul", "print or --edit soul.md")
 	row("hide", "hide a bot from default list")
 	row("unhide", "unhide a bot")
