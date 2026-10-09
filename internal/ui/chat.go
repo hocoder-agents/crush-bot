@@ -27,7 +27,10 @@ func newChatInput() textinput.Model {
 	return ti
 }
 
-func formatTranscript(lines []crush.Line) string {
+func formatTranscript(lines []crush.Line, name string) string {
+	if name == "" {
+		name = "bot"
+	}
 	if len(lines) == 0 {
 		return mutedStyle.Render("(empty session — type a line and press enter)")
 	}
@@ -42,7 +45,7 @@ func formatTranscript(lines []crush.Line) string {
 		case "user":
 			fmt.Fprintf(&b, "%s\n%s\n", keyStyle.Render("you"), body)
 		case "assistant":
-			fmt.Fprintf(&b, "%s\n%s\n", selStyle.Render("bot"), body)
+			fmt.Fprintf(&b, "%s\n%s\n", selStyle.Render(name), body)
 		default:
 			fmt.Fprintf(&b, "%s\n%s\n", mutedStyle.Render(role), body)
 		}
@@ -65,7 +68,7 @@ func loadTranscript(root string, bot roster.Bot) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return formatTranscript(lines), nil
+	return formatTranscript(lines, bot.Slug), nil
 }
 
 func runSay(root string, bot roster.Bot, prompt string) error {

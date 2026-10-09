@@ -3,6 +3,7 @@ package ui
 import (
 	"errors"
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -11,12 +12,15 @@ import (
 	"charm.land/bubbles/v2/textinput"
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/huh/v2"
 	"charm.land/lipgloss/v2"
 
+	"github.com/hocoder-agents/crush-bot/internal/config"
 	"github.com/hocoder-agents/crush-bot/internal/crush"
 	"github.com/hocoder-agents/crush-bot/internal/daemon"
 	"github.com/hocoder-agents/crush-bot/internal/envelope"
 	"github.com/hocoder-agents/crush-bot/internal/group"
+	"github.com/hocoder-agents/crush-bot/internal/protocol"
 	"github.com/hocoder-agents/crush-bot/internal/roster"
 	"github.com/hocoder-agents/crush-bot/internal/spawn"
 )
@@ -44,6 +48,16 @@ var (
 	divStyle    = lipgloss.NewStyle().Foreground(lavender)
 	divHotStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 	boxStyle    = lipgloss.NewStyle().Padding(1, 2)
+
+	modalBox = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("212")).
+			Background(lipgloss.Color("235")).
+			Padding(1, 2)
+	modalTitle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("212")).
+			Background(lipgloss.Color("235"))
 )
 
 type row struct {
@@ -75,6 +89,7 @@ type Model struct {
 	spawnForm      spawnFormState
 	groupForm      groupFormState
 	projectForm    projectFormState
+	edit           *editModal
 	spinnerBot     spinner.Model
 	spinnerGroup   spinner.Model
 }
@@ -263,6 +278,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		default:
 			m.status = "spawned"
 		}
+	case editSubmittedMsg:
+		m.edit = nil
+		m.reload()
+		m.status = "edited @" + msg.slug
+	case editCancelledMsg:
+		m.edit = nil
+		m.status = "edit cancelled"
 	case tea.MouseClickMsg:
 		return m.handleMouse("click", msg.Mouse())
 	case tea.MouseReleaseMsg:
@@ -274,6 +296,38 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.InterruptMsg:
 		return m.quitHost()
 	case tea.KeyPressMsg:
+		if m.edit != nil {
+			switch {
+			case isCtrl(msg, 'q'), isCtrl(msg, 'g'):
+				if isCtrl(msg, 'q') {
+					return m.quitHost()
+				}
+				m.edit = nil
+				m.status = "edit cancelled"
+				return m, nil
+			case msg.String() == "esc":
+				m.edit = nil
+				m.status = "edit cancelled"
+				return m, nil
+			case isCtrl(msg, 's'), msg.String() == "ctrl+q":
+				if err := m.edit.saveEdit(); err != nil {
+					m.status = "edit failed: " + err.Error()
+					return m, nil
+				}
+				slug := m.edit.slug
+				m.edit = nil
+				m.reload()
+				m.status = "edited @" + slug
+				return m, nil
+			case isCtrl(msg, 'c'):
+				return m.quitHost()
+			}
+			form, cmd := m.edit.form.Update(msg)
+			if f, ok := form.(*huh.Form); ok {
+				m.edit.form = f
+			}
+			return m, cmd
+		}
 		if isCtrl(msg, 'q') {
 			return m.quitHost()
 		}
@@ -417,6 +471,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.openGroupForm()
 		case "p":
 			return m.openProjectForm()
+		case "e":
+			if m.focus == focusSide && len(m.rows) > 0 {
+				slug := m.rows[m.cursor].bot.Slug
+				mod, err := newEditModal(m.home, slug)
+				if err != nil {
+					m.status = "edit failed: " + err.Error()
+					return m, nil
+				}
+				m.edit = mod
+				m.status = "editing @" + slug + "  ·  esc cancel  ·  ctrl+s save"
+				return m, mod.form.Init()
+			}
 		case "enter":
 			return m.openSelected()
 		}
@@ -592,10 +658,25 @@ func (m Model) View() tea.View {
 	body := lipgloss.JoinHorizontal(lipgloss.Top, sidebar, div, right)
 	help := m.helpView(m.width)
 	frame := lipgloss.JoinVertical(lipgloss.Left, body, help)
+	if m.edit != nil {
+		frame = overlayCenter(frame, m.edit.view(m.width, m.height))
+	}
 	v := tea.NewView(frame)
 	v.AltScreen = true
 	v.MouseMode = tea.MouseModeCellMotion
 	return v
+}
+
+// overlayCenter places the modal on top of the frame, centered, with the
+// frame visible around it. It aligns by screen cell, preserving ANSI styling.
+func overlayCenter(frame, modal string) string {
+	frameW, frameH := lipgloss.Size(frame)
+	modalW, modalH := lipgloss.Size(modal)
+	x := max(0, (frameW-modalW)/2)
+	y := max(0, (frameH-modalH)/2-1)
+	root := lipgloss.NewLayer(frame)
+	modalLayer := lipgloss.NewLayer(modal).X(x).Y(y).Z(1)
+	return lipgloss.NewCompositor(root, modalLayer).Render()
 }
 
 func (m Model) sidebarView(width, height int) string {
@@ -740,12 +821,101 @@ func (m Model) helpView(width int) string {
 		if p := m.currentProject(); p != "" {
 			proj = userStyle().Render("*" + projectDisplay(p))
 		}
-		s = fmt.Sprintf("%s move  %s chat  %s inbox  %s bot  %s group  %s project %s  %s refresh  %s quicklaunch  %s quit",
+		s = fmt.Sprintf("%s move  %s chat  %s inbox  %s bot  %s group  %s project %s  %s edit  %s refresh  %s quicklaunch  %s quit",
 			keyStyle.Render("j/k"), keyStyle.Render("enter"), keyStyle.Render("i"),
 			keyStyle.Render("n"), keyStyle.Render("g"), keyStyle.Render("p"), proj,
-			keyStyle.Render("r"), keyStyle.Render(":"), keyStyle.Render("q"))
+			keyStyle.Render("e"), keyStyle.Render("r"), keyStyle.Render(":"), keyStyle.Render("q"))
 	}
 	return helpStyle.Width(width).MaxWidth(width).Render(s)
+}
+
+type editModal struct {
+	home string
+	slug string
+	form *huh.Form
+	vals spawn.EditValues
+}
+
+type editSubmittedMsg struct{ slug string }
+type editCancelledMsg struct{ slug string }
+
+func newEditModal(home, slug string) (*editModal, error) {
+	bot, err := roster.Load(home, slug)
+	if err != nil {
+		return nil, err
+	}
+	vals := spawn.EditValuesFrom(bot)
+	return &editModal{
+		home: home,
+		slug: slug,
+		vals: vals,
+		form: spawn.NewEditForm(&vals).WithShowHelp(false).WithTheme(huh.ThemeFunc(themeCharm)),
+	}, nil
+}
+
+// themeCharm keeps the modal on the app's brand colors.
+var themeCharm huh.ThemeFunc = func(isDark bool) *huh.Styles { return huh.ThemeCharm(isDark) }
+
+func (m *editModal) view(width, height int) string {
+	bodyW := min(62, max(40, width-8))
+	formW := bodyW - 4
+	form, _ := m.form.Update(tea.WindowSizeMsg{Width: formW, Height: height - 10})
+	if f, ok := form.(*huh.Form); ok {
+		m.form = f
+	}
+	body := m.form.View()
+	box := modalBox.
+		Width(bodyW).
+		MaxHeight(height - 6).
+		Render(strings.Join([]string{
+			modalTitle.Render("edit @" + m.slug),
+			mutedStyle.Render("esc cancel  ·  tab next  ·  shift+tab back  ·  ctrl+s save"),
+			body,
+		}, "\n"))
+	return lipgloss.Place(
+		max(bodyW, min(width, bodyW+20)),
+		min(height, lipgloss.Height(box)+2),
+		lipgloss.Center, lipgloss.Center,
+		box,
+	)
+}
+
+func (m *editModal) saveEdit() error {
+	p := config.ResolvePaths()
+	cfg, err := config.Load(p)
+	if err != nil {
+		return err
+	}
+	res := spawn.EditResultFrom(&m.vals)
+	bot, warns, err := roster.Update(p.Home, m.slug, roster.UpdateOpts{
+		Title:       res.Title,
+		Description: res.Description,
+		Model:       res.Model,
+		Project:     res.Project,
+		KeepAlive:   res.KeepAlive,
+		Coder:       res.Coder,
+		Bash:        res.Bash,
+		Edit:        res.Edit,
+		Hidden:      res.Hidden,
+	})
+	if err != nil {
+		return err
+	}
+	for _, warn := range warns {
+		fmt.Fprintln(os.Stderr, "warning: "+warn)
+	}
+	all, _ := roster.List(p.Home, true)
+	exe, _ := os.Executable()
+	return protocol.Write(protocol.Options{
+		Root:         p.Home,
+		Bot:          bot,
+		Teammates:    all,
+		Tasks:        cfg.Experimental.Tasks,
+		Groups:       true,
+		IncludeMCP:   true,
+		CrushbotPath: exe,
+		SoulMax:      cfg.SoulMaxBytes,
+	})
 }
 
 func Run(home string) error {

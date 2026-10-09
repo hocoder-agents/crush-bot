@@ -128,6 +128,114 @@ func cmdSpawn(io IO, args []string) int {
 	return 0
 }
 
+func cmdEdit(io IO, args []string) int {
+	fs := flag.NewFlagSet("edit", flag.ContinueOnError)
+	fs.SetOutput(io.Err)
+	title := fs.String("title", "", "display title")
+	desc := fs.String("description", "", "one-line role")
+	model := fs.String("model", "", "Crush model id (empty = default)")
+	project := fs.String("project", "", "absolute project path (advisory, not Crush cwd)")
+	coder := fs.Bool("coder", false, "enable bash and edit tools")
+	bash := fs.Bool("bash", false, "allow bash")
+	editTool := fs.Bool("edit-tool", false, "allow edit")
+	keepAlive := fs.Bool("keepalive", false, "keep a crush server warm for this bot")
+	hidden := fs.Bool("hidden", false, "hide from the default list")
+	slug, flagArgs, err := slugThenFlags(args)
+	if err != nil || slug == "" {
+		fmt.Fprintln(io.Err, errStyle.Render("usage: crushbot edit <slug> [flags]   (no flags = TUI form)"))
+		return 2
+	}
+	if err := fs.Parse(flagArgs); err != nil {
+		return 2
+	}
+	if fs.NArg() != 0 {
+		fmt.Fprintln(io.Err, errStyle.Render("usage: crushbot edit <slug> [flags]"))
+		return 2
+	}
+	p := config.ResolvePaths()
+	cfg, err := config.Load(p)
+	if err != nil {
+		return fail(io, err)
+	}
+	bot, err := roster.Load(p.Home, slug)
+	if err != nil {
+		return fail(io, err)
+	}
+	var opts roster.UpdateOpts
+	if fs.NFlag() == 0 {
+		if !interactive() {
+			fmt.Fprintln(io.Err, errStyle.Render("usage: crushbot edit <slug> [flags]"))
+			return 2
+		}
+		if !bot.Hidden {
+			if _, err := roster.SetHidden(p.Home, slug, true); err != nil {
+				return fail(io, err)
+			}
+			defer func() { _, _ = roster.SetHidden(p.Home, slug, false) }()
+		}
+		res, err := spawn.EditFormIO(nil, nil, bot)
+		if err != nil {
+			return fail(io, err)
+		}
+		opts = roster.UpdateOpts{
+			Title:       res.Title,
+			Description: res.Description,
+			Model:       res.Model,
+			Project:     res.Project,
+			KeepAlive:   res.KeepAlive,
+			Coder:       res.Coder,
+			Bash:        res.Bash,
+			Edit:        res.Edit,
+			Hidden:      res.Hidden,
+		}
+	} else {
+		opts = roster.UpdateOpts{
+			Title:       optStr(*title),
+			Description: optStr(*desc),
+			Model:       optStr(*model),
+			Project:     optStr(*project),
+			KeepAlive:   optBool(fs, "keepalive", keepAlive),
+			Coder:       optBool(fs, "coder", coder),
+			Bash:        optBool(fs, "bash", bash),
+			Edit:        optBool(fs, "edit-tool", editTool),
+			Hidden:      optBool(fs, "hidden", hidden),
+		}
+	}
+	bot, warns, err := roster.Update(p.Home, slug, opts)
+	if err != nil {
+		return fail(io, err)
+	}
+	for _, w := range warns {
+		fmt.Fprintln(io.Err, mutedStyle.Render("warning: "+w))
+	}
+	if err := writeProtocol(p, cfg, bot); err != nil {
+		return fail(io, err)
+	}
+	fmt.Fprintln(io.Out, okStyle.Render("edited "+bot.Slug))
+	return 0
+}
+
+func optStr(got string) roster.Opt[string] {
+	if got == "" {
+		return roster.Opt[string]{}
+	}
+	return roster.StrOpt(got)
+}
+
+func optBool(fs *flag.FlagSet, name string, set *bool) roster.Opt[bool] {
+	f := fs.Lookup(name)
+	if f == nil {
+		return roster.Opt[bool]{}
+	}
+	if _, ok := f.Value.(interface{ IsBoolFlag() bool }); !ok {
+		return roster.Opt[bool]{}
+	}
+	if f.DefValue == f.Value.String() && !*set {
+		return roster.Opt[bool]{}
+	}
+	return roster.BoolOpt(*set)
+}
+
 func cmdList(io IO, args []string) int {
 	fs := flag.NewFlagSet("list", flag.ContinueOnError)
 	fs.SetOutput(io.Err)
